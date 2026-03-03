@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3. Gestão de Produtos</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 p-4 text-white">
+    <div class="max-w-md mx-auto space-y-4">
+        <div class="flex justify-between items-center">
+            <a href="index.html" class="text-indigo-400 font-bold text-xs uppercase">← Voltar</a>
+            <h1 class="font-black uppercase tracking-tighter italic">Banco Mestre</h1>
+        </div>
+
+        <div class="bg-slate-800 p-4 rounded-3xl border border-slate-700">
+            <input type="text" id="filtro" oninput="render()" placeholder="🔍 Pesquisar para editar..." class="w-full p-4 rounded-2xl bg-slate-900 text-white font-bold outline-none border border-slate-700">
+        </div>
+
+        <div id="container" class="space-y-3"></div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyD4jdw3dkSl-63iyBypdip4NXUah2mdie8",
+            authDomain: "rag-final-474711.firebaseapp.com",
+            databaseURL: "https://rag-final-474711-default-rtdb.firebaseio.com",
+            projectId: "rag-final-474711",
+            storageBucket: "rag-final-474711.firebasestorage.app",
+            messagingSenderId: "281529599553",
+            appId: "1:281529599553:web:2e466ab204c1dc7210a8c0"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        let dados = [];
+
+        db.ref('inventario_mestre').on('value', s => {
+            const v = s.val() || {};
+            dados = Object.entries(v).map(([id, val]) => ({id, ...val}));
+            render();
+        });
+
+        function render() {
+            const f = document.getElementById('filtro').value.toLowerCase();
+            const box = document.getElementById('container');
+            box.innerHTML = '';
+            
+            dados.filter(i => i.nome.toLowerCase().includes(f)).slice(0, 15).forEach(item => {
+                const d = document.createElement('div');
+                d.className = "bg-slate-800 p-4 rounded-2xl border border-slate-700 space-y-2";
+                d.innerHTML = `
+                    <div class="flex gap-2">
+                        <input type="text" value="${item.nome}" onblur="update('${item.id}', this.value, '${item.cat}')" class="flex-1 bg-slate-900 p-2 rounded-lg text-sm font-bold border-none outline-none">
+                        <button onclick="del('${item.id}')" class="text-red-500 font-bold px-2">✕</button>
+                    </div>
+                    <select onchange="update('${item.id}', '${item.nome}', this.value)" class="w-full bg-slate-700 p-2 rounded-lg text-[10px] font-black uppercase text-slate-400 outline-none">
+                        ${['Geral','Seminaristas','Hortifruti','Carnes','Diversos','Frios','Frutas'].map(c => 
+                            `<option value="${c}" ${item.cat === c ? 'selected' : ''}>${c}</option>`
+                        ).join('')}
+                    </select>
+                `;
+                box.appendChild(d);
+            });
+        }
+
+        function update(id, n, c) { db.ref('inventario_mestre/' + id).update({nome: n, cat: c}); }
+        function del(id) { if(confirm("Excluir item do estoque mestre?")) db.ref('inventario_mestre/' + id).remove(); }
+    </script>
+</body>
+</html>
