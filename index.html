@@ -3,21 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lista de Compras da Casa</title>
+    <title>Lista de Compras da Casa - Versão PRO</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body class="bg-slate-100 font-sans">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef } = React;
+        const { jsPDF } = window.jspdf;
 
-        // Suas credenciais configuradas
         const firebaseConfig = {
             apiKey: "AIzaSyD4jdw3dkSl-63iyBypdip4NXUah2mdie8",
             authDomain: "rag-final-474711.firebaseapp.com",
@@ -42,10 +43,15 @@
             "Frios": ["Anel de Cebola", "Hamburguer", "Iogurte", "Manteiga", "Mortadela", "Nuggets de Frango", "Pão de Queijo", "Pizza", "Presunto fatiado", "Queijo Meia Cura", "Queijo Minas Frescal", "Queijo Mussarela Fatiado", "Requeijão", "Sorvete", "Suco Natural", "Alho Descascado", "Banha", "Batata Frita", "Calabresa", "Catupiry", "Couve-Flor congelada", "Creme de Leite Fresco", "Massa de Pastel", "Nata", "Nhoque", "Parmesão Defumado", "Queijo Mussarela (peça)", "Rondelli", "Ovos (Cartela)"]
         };
 
+        const FLAT_LIST = Object.entries(LISTA_MUITO_LONGA).flatMap(([cat, itens]) => itens.map(nome => ({nome, cat})));
+
         function App() {
             const [aba, setAba] = useState('preparo');
             const [listaCompra, setListaCompra] = useState({});
-            const [busca, setBusca] = useState('');
+            const [inputBusca, setInputBusca] = useState('');
+            const [inputQtd, setInputQtd] = useState(1);
+            const [sugestoes, setSugestoes] = useState([]);
+            const qtdRef = useRef(null);
 
             useEffect(() => {
                 const ref = db.ref('compra_atual');
@@ -53,78 +59,157 @@
                 return () => ref.off();
             }, []);
 
-            const toggleItem = (nome, cat) => {
-                const id = btoa(unescape(encodeURIComponent(nome))).replace(/=/g, "");
-                if (listaCompra[id]) {
-                    db.ref(`compra_atual/${id}`).remove();
+            const handleBusca = (val) => {
+                setInputBusca(val);
+                if (val.length > 1) {
+                    const filtered = FLAT_LIST.filter(i => i.nome.toLowerCase().includes(val.toLowerCase())).slice(0, 5);
+                    setSugestoes(filtered);
                 } else {
-                    db.ref(`compra_atual/${id}`).set({ nome, cat, qtd: 1, comprado: false });
+                    setSugestoes([]);
                 }
             };
 
-            const mudarQtd = (id, n) => {
-                const novaQtd = Math.max(1, (listaCompra[id].qtd || 1) + n);
-                db.ref(`compra_atual/${id}`).update({ qtd: novaQtd });
+            const selecionarItem = (item) => {
+                setInputBusca(item.nome);
+                setSugestoes([]);
+                qtdRef.current?.focus();
             };
 
-            const toggleComprado = (id) => {
-                db.ref(`compra_atual/${id}`).update({ comprado: !listaCompra[id].comprado });
+            const adicionarItemFinal = () => {
+                const itemEncontrado = FLAT_LIST.find(i => i.nome.toLowerCase() === inputBusca.toLowerCase());
+                if (itemEncontrado) {
+                    const id = btoa(unescape(encodeURIComponent(itemEncontrado.nome))).replace(/=/g, "");
+                    db.ref(`compra_atual/${id}`).set({ 
+                        nome: itemEncontrado.nome, 
+                        cat: itemEncontrado.cat, 
+                        qtd: parseInt(inputQtd) || 1, 
+                        comprado: false 
+                    });
+                    setInputBusca('');
+                    setInputQtd(1);
+                }
+            };
+
+            const exportarPDF = () => {
+                const doc = new jsPDF();
+                const data = new Date().toLocaleDateString();
+                
+                doc.setFontSize(18);
+                doc.text("Lista de Compras da Casa", 20, 20);
+                doc.setFontSize(10);
+                doc.text(`Data: ${data}`, 20, 28);
+                
+                let y = 40;
+                const categorias = [...new Set(Object.values(listaCompra).map(i => i.cat))];
+                
+                categorias.forEach(cat => {
+                    doc.setFont("helvetica", "bold");
+                    doc.text(cat.toUpperCase(), 20, y);
+                    y += 7;
+                    doc.setFont("helvetica", "normal");
+                    
+                    Object.values(listaCompra).filter(i => i.cat === cat).forEach(item => {
+                        doc.text(`[ ] ${item.nome} (Qtd: ${item.qtd})`, 25, y);
+                        y += 6;
+                        if (y > 280) { doc.addPage(); y = 20; }
+                    });
+                    y += 5;
+                });
+                
+                doc.save(`lista-compras-${data}.pdf`);
+            };
+
+            const limparLista = () => {
+                if (window.confirm("Deseja zerar toda a lista de compras?")) {
+                    db.ref('compra_atual').remove();
+                }
             };
 
             return (
                 <div className="max-w-md mx-auto min-h-screen bg-white shadow-xl flex flex-col">
-                    <header className="bg-indigo-700 text-white p-6 text-center shadow-md">
+                    <header className="bg-indigo-700 text-white p-6 text-center shadow-md flex justify-between items-center">
                         <h1 className="text-xl font-black uppercase tracking-widest">Lista da Casa</h1>
                     </header>
 
-                    <nav className="flex bg-indigo-600 text-white font-bold text-xs">
-                        <button onClick={() => setAba('preparo')} className={`flex-1 py-4 transition ${aba==='preparo'?'bg-indigo-800 border-b-4 border-yellow-400':''}`}>PLANEJAR</button>
-                        <button onClick={() => setAba('compras')} className={`flex-1 py-4 transition ${aba==='compras'?'bg-indigo-800 border-b-4 border-yellow-400':''}`}>NO MERCADO</button>
+                    <nav className="flex bg-indigo-600 text-white font-bold text-xs sticky top-0 z-20">
+                        <button onClick={() => setAba('preparo')} className={`flex-1 py-4 ${aba==='preparo'?'bg-indigo-900 border-b-4 border-yellow-400':''}`}>PLANEJAR</button>
+                        <button onClick={() => setAba('compras')} className={`flex-1 py-4 ${aba==='compras'?'bg-indigo-900 border-b-4 border-yellow-400':''}`}>NO MERCADO</button>
                     </nav>
 
                     <main className="flex-1 p-4 overflow-y-auto">
-                        {aba === 'preparo' ? (
-                            <div>
-                                <input placeholder="🔍 Buscar item..." className="w-full p-4 rounded-xl mb-6 bg-slate-100 border-none outline-none" onChange={e => setBusca(e.target.value)} />
-                                {Object.keys(LISTA_MUITO_LONGA).map(cat => (
-                                    <div key={cat} className="mb-6">
-                                        <h3 className="text-indigo-500 font-bold text-xs uppercase mb-2 ml-1">{cat}</h3>
-                                        {LISTA_MUITO_LONGA[cat].filter(i => i.toLowerCase().includes(busca.toLowerCase())).map(item => {
-                                            const id = btoa(unescape(encodeURIComponent(item))).replace(/=/g, "");
-                                            const selecionado = !!listaCompra[id];
-                                            return (
-                                                <div key={item} className={`flex items-center justify-between p-3 rounded-xl mb-1 border transition ${selecionado ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-100'}`}>
-                                                    <label className="flex items-center gap-3 flex-1 cursor-pointer">
-                                                        <input type="checkbox" checked={selecionado} onChange={() => toggleItem(item, cat)} className="w-5 h-5 accent-indigo-600" />
-                                                        <span className={selecionado ? "font-bold text-indigo-900" : "text-slate-600"}>{item}</span>
-                                                    </label>
-                                                    {selecionado && (
-                                                        <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-lg border shadow-sm font-bold">
-                                                            <button onClick={() => mudarQtd(id, -1)} className="px-2 text-indigo-600">-</button>
-                                                            <span className="text-xs">{listaCompra[id].qtd}</span>
-                                                            <button onClick={() => mudarQtd(id, 1)} className="px-2 text-indigo-600">+</button>
+                        {aba === 'preparo' && (
+                            <div className="space-y-4">
+                                <div className="relative bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
+                                    <h3 className="text-[10px] font-bold text-indigo-400 uppercase mb-2">Adicionar Item</h3>
+                                    <div className="flex gap-2">
+                                        <div className="relative flex-1">
+                                            <input 
+                                                value={inputBusca} 
+                                                onChange={(e) => handleBusca(e.target.value)}
+                                                placeholder="Nome..." 
+                                                className="w-full p-3 rounded-lg border-none text-sm outline-none shadow-sm"
+                                            />
+                                            {sugestoes.length > 0 && (
+                                                <div className="absolute top-full left-0 right-0 bg-white shadow-xl rounded-b-lg z-30 border border-slate-200">
+                                                    {sugestoes.map(s => (
+                                                        <div key={s.nome} onClick={() => selecionarItem(s)} className="p-3 hover:bg-indigo-50 cursor-pointer border-b text-sm last:border-0">
+                                                            <span className="font-bold">{s.nome}</span> <span className="text-[10px] text-slate-400 uppercase">({s.cat})</span>
                                                         </div>
-                                                    )}
+                                                    ))}
                                                 </div>
-                                            );
-                                        })}
+                                            )}
+                                        </div>
+                                        <input 
+                                            ref={qtdRef}
+                                            type="number" 
+                                            value={inputQtd} 
+                                            onChange={e => setInputQtd(e.target.value)}
+                                            onKeyDown={e => e.key === 'Enter' && adicionarItemFinal()}
+                                            className="w-16 p-3 rounded-lg border-none text-center font-bold outline-none shadow-sm"
+                                        />
+                                        <button onClick={adicionarItemFinal} className="bg-indigo-600 text-white px-4 rounded-lg font-bold shadow-md">+</button>
                                     </div>
-                                ))}
+                                </div>
+
+                                <div className="mt-8">
+                                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Itens Selecionados:</h3>
+                                    {Object.entries(listaCompra).map(([id, item]) => (
+                                        <div key={id} className="flex justify-between items-center p-3 bg-white border border-slate-100 rounded-xl mb-2 shadow-sm">
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] font-bold text-indigo-400 uppercase">{item.cat}</span>
+                                                <span className="font-bold text-slate-700">{item.nome}</span>
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full font-black text-xs">x{item.qtd}</span>
+                                                <button onClick={() => db.ref(`compra_atual/${id}`).remove()} className="text-red-400 font-bold px-2">✕</button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
-                        ) : (
-                            <div className="space-y-3">
-                                {Object.keys(listaCompra).length === 0 && <p className="text-center text-slate-400 mt-20 italic">Sua lista está vazia.</p>}
+                        )}
+
+                        {aba === 'compras' && (
+                            <div className="space-y-3 pb-24">
+                                <div className="flex justify-between items-center bg-indigo-50 p-4 rounded-2xl border border-indigo-100 mb-4">
+                                    <div className="flex gap-2">
+                                        <button onClick={exportarPDF} className="text-[10px] bg-indigo-600 text-white px-3 py-1 rounded-full font-bold uppercase tracking-tighter">Exportar PDF</button>
+                                        <button onClick={limparLista} className="text-[10px] bg-red-100 text-red-600 px-3 py-1 rounded-full font-bold uppercase tracking-tighter">Limpar</button>
+                                    </div>
+                                    <span className="text-xs font-black text-indigo-900 uppercase">Lista Mercado</span>
+                                </div>
+                                
                                 {Object.entries(listaCompra).sort((a,b) => a[1].cat.localeCompare(b[1].cat)).map(([id, item]) => (
-                                    <div key={id} onClick={() => toggleComprado(id)} className={`p-4 rounded-2xl border-2 flex justify-between items-center transition ${item.comprado ? 'bg-slate-50 border-transparent opacity-50 grayscale' : 'bg-white border-white shadow-lg active:scale-95'}`}>
-                                        <div className="flex gap-4 items-center">
+                                    <div key={id} onClick={() => db.ref(`compra_atual/${id}`).update({comprado: !item.comprado})} className={`p-4 rounded-2xl border-2 flex justify-between items-center transition-all ${item.comprado ? 'bg-slate-50 border-transparent opacity-50' : 'bg-white border-white shadow-lg active:scale-95'}`}>
+                                        <div className="flex gap-4 items-center text-left">
                                             <div className="text-2xl">{item.comprado ? '✅' : '⬜'}</div>
                                             <div>
-                                                <span className="text-[10px] font-bold text-indigo-500 uppercase">{item.cat}</span>
+                                                <span className="text-[8px] font-bold text-indigo-500 uppercase">{item.cat}</span>
                                                 <p className={`text-lg font-bold leading-none ${item.comprado ? 'line-through text-slate-400' : ''}`}>{item.nome}</p>
                                             </div>
                                         </div>
                                         <div className="bg-indigo-700 text-white px-3 py-1 rounded-lg font-black shadow-md">
-                                            <span className="block text-[8px] opacity-70 uppercase leading-none mb-1 text-center">Qtd</span>
+                                            <span className="block text-[8px] opacity-70 uppercase leading-none mb-1 text-center font-bold italic">Qtd</span>
                                             <div className="text-lg leading-none">{item.qtd}</div>
                                         </div>
                                     </div>
