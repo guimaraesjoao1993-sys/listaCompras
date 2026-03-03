@@ -14,8 +14,8 @@
 </head>
 <body class="bg-gray-100 font-sans">
 
-    <div id="status-bar" class="bg-slate-800 text-[10px] text-white p-1 text-center font-bold uppercase tracking-widest">
-        Conectando ao Banco...
+    <div id="status-bar" class="bg-slate-800 text-[10px] text-white p-1 text-center font-bold uppercase">
+        Carregando...
     </div>
 
     <nav class="flex bg-indigo-700 text-white font-bold text-[10px] uppercase sticky top-0 z-50 shadow-lg">
@@ -28,32 +28,30 @@
         
         <section id="aba-preparo" class="space-y-4">
             <div class="bg-indigo-50 p-4 rounded-3xl border border-indigo-100 shadow-inner">
-                <input type="text" id="busca-input" oninput="filtrarBusca()" placeholder="🔍 Buscar produto..." class="w-full p-4 rounded-2xl mb-2 font-bold outline-none border-none shadow-sm">
+                <input type="text" id="busca-input" oninput="filtrarBusca()" placeholder="🔍 O que está faltando?" class="w-full p-4 rounded-2xl mb-2 font-bold outline-none border-none shadow-sm">
                 <div id="sugestoes-box" class="space-y-1 mb-2"></div>
                 
                 <div class="flex gap-2">
-                    <input type="text" id="qtd-input" placeholder="Qtd" class="w-20 p-3 rounded-xl outline-none font-bold border">
-                    <input type="text" id="obs-input" placeholder="Observação..." class="flex-1 p-3 rounded-xl outline-none italic text-sm border">
+                    <input type="text" id="qtd-input" placeholder="Qtd" class="w-20 p-3 rounded-xl outline-none font-bold border bg-white">
+                    <input type="text" id="obs-input" placeholder="Observação..." class="flex-1 p-3 rounded-xl outline-none italic text-sm border bg-white">
                 </div>
-                <button onclick="adicionarManual()" class="w-full mt-3 bg-indigo-600 text-white font-black py-4 rounded-2xl uppercase text-xs shadow-lg active:scale-95 transition-all">Adicionar</button>
+                <button onclick="adicionarManual()" class="w-full mt-3 bg-indigo-600 text-white font-black py-4 rounded-2xl uppercase text-xs shadow-lg active:scale-95 transition-all">Adicionar à Lista</button>
             </div>
             <div id="lista-preparo-atual" class="space-y-2 pt-4"></div>
         </section>
 
         <section id="aba-compras" class="hidden space-y-6">
-            <button onclick="zerarLista()" class="w-full bg-red-50 text-red-600 p-3 rounded-xl text-[10px] font-black uppercase">Limpar Lista Completa</button>
+            <button onclick="zerarLista()" class="w-full bg-red-50 text-red-600 p-3 rounded-xl text-[10px] font-black uppercase">Limpar Lista</button>
             <div id="lista-mercado-final" class="space-y-6"></div>
         </section>
 
         <section id="aba-editar" class="hidden space-y-4">
-            <input type="text" id="filtro-banco" oninput="renderizarBanco()" placeholder="🔍 Pesquisar no banco mestre..." class="w-full p-4 rounded-xl border-2 outline-none font-bold shadow-sm mb-4">
+            <input type="text" id="filtro-banco" oninput="renderizarBanco()" placeholder="🔍 Pesquisar no estoque..." class="w-full p-4 rounded-xl border-2 outline-none font-bold shadow-sm mb-4">
             <div id="lista-banco-mestre" class="space-y-3"></div>
         </section>
-
     </main>
 
     <script>
-        // CONFIGURAÇÃO FIREBASE
         const firebaseConfig = {
             apiKey: "AIzaSyD4jdw3dkSl-63iyBypdip4NXUah2mdie8",
             authDomain: "rag-final-474711.firebaseapp.com",
@@ -69,12 +67,15 @@
         let inventario = [];
         let compraAtual = {};
 
-        // INICIALIZAÇÃO
+        // Função para ignorar acentos e maiúsculas
+        function limparTexto(str) {
+            return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        }
+
         db.ref('inventario_mestre').on('value', snap => {
             const val = snap.val() || {};
             inventario = Object.entries(val).map(([id, v]) => ({ id, ...v }));
-            document.getElementById('status-bar').innerText = `CONECTADO ✅ | ${inventario.length} ITENS NO BANCO`;
-            if(document.getElementById('aba-editar').style.display !== 'none') renderizarBanco();
+            document.getElementById('status-bar').innerText = `BANCO ATIVO ✅ | ${inventario.length} ITENS`;
         });
 
         db.ref('compra_atual').on('value', snap => {
@@ -83,68 +84,72 @@
             renderizarMercado();
         });
 
-        // NAVEGAÇÃO
         function mudarAba(aba) {
-            document.getElementById('aba-preparo').classList.add('hidden');
-            document.getElementById('aba-compras').classList.add('hidden');
-            document.getElementById('aba-editar').classList.add('hidden');
-            document.getElementById('btn-preparo').classList.remove('aba-ativa');
-            document.getElementById('btn-compras').classList.remove('aba-ativa');
-            document.getElementById('btn-editar').classList.remove('aba-ativa');
-
+            ['preparo', 'compras', 'editar'].forEach(a => {
+                document.getElementById('aba-' + a).classList.add('hidden');
+                document.getElementById('btn-' + a).classList.remove('aba-ativa');
+            });
             document.getElementById('aba-' + aba).classList.remove('hidden');
             document.getElementById('btn-' + aba).classList.add('aba-ativa');
-            
             if(aba === 'editar') renderizarBanco();
         }
 
-        // LÓGICA DE BUSCA
         function filtrarBusca() {
-            const termo = document.getElementById('busca-input').value.toLowerCase();
+            const input = document.getElementById('busca-input').value;
+            const termo = limparTexto(input);
             const box = document.getElementById('sugestoes-box');
             box.innerHTML = '';
-            if (termo.length < 2) return;
+            
+            if (termo.length < 1) return;
 
-            const filtrados = inventario.filter(i => i.nome.toLowerCase().includes(termo)).slice(0, 5);
+            // Busca inteligente
+            const filtrados = inventario.filter(i => {
+                const nomeLimpo = limparTexto(i.nome);
+                return nomeLimpo.includes(termo);
+            }).slice(0, 6);
+
             filtrados.forEach(s => {
                 const div = document.createElement('div');
-                div.className = "p-4 bg-white mb-1 rounded-xl border-2 border-indigo-100 text-sm font-bold flex justify-between active:bg-indigo-100";
+                div.className = "p-4 bg-white mb-1 rounded-xl border-2 border-indigo-100 text-sm font-bold flex justify-between cursor-pointer active:bg-indigo-100";
                 div.innerHTML = `<span>${s.nome}</span> <span class="text-[9px] opacity-40 uppercase">${s.cat}</span>`;
                 div.onclick = () => {
                     document.getElementById('busca-input').value = s.nome;
                     box.innerHTML = '';
+                    document.getElementById('qtd-input').focus();
                 };
                 box.appendChild(div);
             });
         }
 
-        // ADICIONAR ITEM
         function adicionarManual() {
             const nome = document.getElementById('busca-input').value;
             const qtd = document.getElementById('qtd-input').value || "1";
             const obs = document.getElementById('obs-input').value || "";
             if (!nome) return;
 
+            const itemExistente = inventario.find(i => i.nome === nome);
+            const categoria = itemExistente ? itemExistente.cat : "Geral";
             const id = btoa(unescape(encodeURIComponent(nome))).replace(/=/g, "");
+
             db.ref('compra_atual/' + id).set({
-                nome, qtd, obs, comprado: false, cat: "Geral"
+                nome, qtd, obs, comprado: false, cat: categoria
             });
             
             document.getElementById('busca-input').value = '';
             document.getElementById('qtd-input').value = '';
             document.getElementById('obs-input').value = '';
+            document.getElementById('sugestoes-box').innerHTML = '';
         }
 
-        // RENDERIZAR LISTAS
         function renderizarListaPreparo() {
             const container = document.getElementById('lista-preparo-atual');
-            container.innerHTML = '<h3 class="text-[10px] font-black text-slate-400 uppercase ml-2">Lista para comprar:</h3>';
+            container.innerHTML = '';
             Object.entries(compraAtual).forEach(([id, item]) => {
                 const div = document.createElement('div');
-                div.className = "p-4 bg-white rounded-2xl shadow-sm border-l-8 border-indigo-500 flex justify-between items-center";
+                div.className = "p-4 bg-white rounded-2xl shadow-sm border-l-4 border-indigo-500 flex justify-between items-center mb-2";
                 div.innerHTML = `<div><p class="font-bold text-xs uppercase">${item.nome} (${item.qtd})</p>
-                                 <p class="text-[10px] text-indigo-500 italic">${item.obs}</p></div>
-                                 <button onclick="remover('${id}')" class="text-red-400 font-bold p-2">✕</button>`;
+                                 <p class="text-[10px] text-indigo-500 italic">${item.obs || ''}</p></div>
+                                 <button onclick="remover('${id}')" class="text-red-400 font-bold p-2 text-xl">✕</button>`;
                 container.appendChild(div);
             });
         }
@@ -152,24 +157,24 @@
         function renderizarMercado() {
             const container = document.getElementById('lista-mercado-final');
             container.innerHTML = '';
-            const categorias = {};
+            const cats = {};
             Object.values(compraAtual).forEach(i => {
-                if(!categorias[i.cat]) categorias[i.cat] = [];
-                categorias[i.cat].push(i);
+                if(!cats[i.cat]) cats[i.cat] = [];
+                cats[i.cat].push(i);
             });
 
-            Object.keys(categorias).sort().forEach(cat => {
+            Object.keys(cats).sort().forEach(cat => {
                 const sec = document.createElement('div');
                 sec.innerHTML = `<h3 class="text-[10px] font-black text-indigo-400 uppercase text-center border-b pb-1 mb-2 tracking-widest">${cat}</h3>`;
-                categorias[cat].forEach(item => {
+                cats[cat].forEach(item => {
                     const id = btoa(unescape(encodeURIComponent(item.nome))).replace(/=/g, "");
                     const card = document.createElement('div');
-                    card.className = `p-5 rounded-[2rem] flex justify-between items-center mb-2 ${item.comprado ? 'bg-gray-100 opacity-40 grayscale' : 'bg-white shadow-lg border border-white'}`;
+                    card.className = `p-4 rounded-3xl flex justify-between items-center mb-2 transition-all ${item.comprado ? 'bg-gray-200 opacity-40 scale-95' : 'bg-white shadow-md'}`;
                     card.onclick = () => db.ref('compra_atual/' + id).update({comprado: !item.comprado});
                     card.innerHTML = `<div class="flex gap-4 items-center">
-                                        <div class="text-2xl">${item.comprado ? '✅' : '⬜'}</div>
-                                        <div><span class="text-lg font-bold ${item.comprado ? 'line-through text-gray-400' : 'text-gray-800'}">${item.nome}</span>
-                                        ${!item.comprado ? `<p class="text-[10px] text-indigo-500">${item.obs}</p>` : ''}</div>
+                                        <div class="text-xl">${item.comprado ? '✅' : '⬜'}</div>
+                                        <div><span class="text-base font-bold ${item.comprado ? 'line-through text-gray-500' : 'text-gray-800'}">${item.nome}</span>
+                                        <p class="text-[10px] text-indigo-500">${item.obs || ''}</p></div>
                                       </div>
                                       <div class="bg-indigo-700 text-white px-3 py-1 rounded-xl font-bold text-xs">${item.qtd}</div>`;
                     sec.appendChild(card);
@@ -179,19 +184,19 @@
         }
 
         function renderizarBanco() {
-            const filtro = document.getElementById('filtro-banco').value.toLowerCase();
+            const filtro = limparTexto(document.getElementById('filtro-banco').value);
             const container = document.getElementById('lista-banco-mestre');
             container.innerHTML = '';
-            const filtrados = inventario.filter(i => i.nome.toLowerCase().includes(filtro)).slice(0, 15);
+            const filtrados = inventario.filter(i => limparTexto(i.nome).includes(filtro)).slice(0, 10);
 
             filtrados.forEach(item => {
                 const div = document.createElement('div');
-                div.className = "p-4 bg-white border rounded-2xl shadow-sm space-y-2";
+                div.className = "p-4 bg-white border rounded-2xl space-y-2 mb-2 shadow-sm";
                 div.innerHTML = `<div class="flex gap-2">
-                                    <input type="text" value="${item.nome}" onblur="atualizarBanco('${item.id}', this.value, '${item.cat}')" class="flex-1 font-bold p-2 bg-gray-50 rounded text-sm">
+                                    <input type="text" value="${item.nome}" onblur="atualizarBanco('${item.id}', this.value, '${item.cat}')" class="flex-1 font-bold p-2 bg-gray-50 rounded text-sm border">
                                     <button onclick="excluirBanco('${item.id}')" class="text-red-400 font-bold px-2">✕</button>
                                  </div>
-                                 <select onchange="atualizarBanco('${item.id}', '${item.nome}', this.value)" class="w-full p-2 bg-gray-100 rounded text-[10px] font-bold uppercase text-gray-500">
+                                 <select onchange="atualizarBanco('${item.id}', '${item.nome}', this.value)" class="w-full p-2 bg-gray-100 rounded text-[10px] font-bold uppercase">
                                     <option ${item.cat==='Geral'?'selected':''} value="Geral">Geral</option>
                                     <option ${item.cat==='Seminaristas'?'selected':''} value="Seminaristas">Seminaristas</option>
                                     <option ${item.cat==='Hortifruti'?'selected':''} value="Hortifruti">Hortifruti</option>
@@ -204,9 +209,8 @@
             });
         }
 
-        // AÇÕES DO BANCO
         function remover(id) { db.ref('compra_atual/' + id).remove(); }
-        function zerarLista() { if(confirm("Zerar lista?")) db.ref('compra_atual').remove(); }
+        function zerarLista() { if(confirm("Limpar lista?")) db.ref('compra_atual').remove(); }
         function atualizarBanco(id, nome, cat) { db.ref('inventario_mestre/' + id).update({nome, cat}); }
         function excluirBanco(id) { if(confirm("Excluir do banco?")) db.ref('inventario_mestre/' + id).remove(); }
     </script>
