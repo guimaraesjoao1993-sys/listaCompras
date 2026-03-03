@@ -3,202 +3,129 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Compras Pro</title>
+    <title>Lista de Compras da Casa</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .ios-scroll { -webkit-overflow-scrolling: touch; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-    </style>
 </head>
-<body class="bg-slate-50 text-slate-900">
+<body class="bg-slate-100 font-sans">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect } = React;
+
+        // Suas credenciais configuradas
+        const firebaseConfig = {
+            apiKey: "AIzaSyD4jdw3dkSl-63iyBypdip4NXUah2mdie8",
+            authDomain: "rag-final-474711.firebaseapp.com",
+            databaseURL: "https://rag-final-474711-default-rtdb.firebaseio.com",
+            projectId: "rag-final-474711",
+            storageBucket: "rag-final-474711.firebasestorage.app",
+            messagingSenderId: "281529599553",
+            appId: "1:281529599553:web:2e466ab204c1dc7210a8c0",
+            measurementId: "G-2JPNZNTGQQ"
+        };
+
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        const LISTA_MUITO_LONGA = {
+            "Seminaristas": ["Achocolatado", "Acendedor", "Adoçante", "Aveia", "Barrinha de Cereal", "Biscoito Club Social", "Biscoito Club Social Integral", "Biscoito de rosquinha", "Café", "Caixa de Chocolate Lacta", "Catchup", "Cerveja", "Chás", "Chia", "Cobertura de Sorvete", "Farofa Temperada", "Filtro de Café (103)", "Fósforo grande", "Geléia", "Granola", "Guardanapo de Boca", "Iogurte Natural", "Leite em pó", "Leite Normal", "Leite Zero Lactose", "Linhaça", "Maionese tubo", "Mel", "Molho de Pimenta", "Mostarda", "Nescau Ball", "Paçoquinha", "Pacote de Sonho de Valsa", "Pão Caseiro, do padre ou outro", "Pão de Forma Tradicional", "Pão de Milho", "Pão para Hambúrguer", "Pipoca", "Refrigerante Coca-Cola", "Refrigerante Coca-Cola Zero", "Água com Gás", "Refrigerante Fanta", "Refrigerante Guaraná", "Refrigerante Sprite", "Suco Concentrado", "Suco Saquinho", "Sucrilhos", "Suspiro Pequeno", "Toalha de Papel (Mãos)", "Vinho tinto seco", "Wafer Chocolate", "Wafer Morango"],
+            "Geral": ["Açúcar Cristal", "Açúcar Refinado", "Açúcar Mascavo", "Alcaparra", "Alecrim", "Alho Frito", "Ameixa Seca", "Amêndoa Natural sem sal crua", "Amendoim", "Amido de Milho", "Arroz", "Azeite Vidro Verde", "Azeite Vidro Vermelho", "Azeitona sem caroço Inteira", "Azeitona sem caroço Picada", "Batata Palha", "Bolacha de Champagne", "Bolacha de Maisena", "Café Gourmet", "Canela em Pó", "Canjica", "Castanha de caju sem sal crua", "Cesta PADRE LUIZ", "Champignon", "Chocolate 100% Cacau", "Chocolate em pó 50 Melk", "Chocolate Branco", "Chocolate do padre", "Chocolate Granulado", "Chocolate Meio Amargo Barra", "Coco ralado", "Copo Plástico", "Creme de Cebola", "Creme de Leite", "Cuscuz de milho", "Cuscuz Marroquino", "Ervas Finas (Erva Doce)", "Ervilha", "Essência de Baunilha", "Extrato de Tomate Elefante", "Fardo de Refri", "Farinha de Mandioca Deusa", "Farinha de Milho", "Farinha de Rosca", "Farinha de Trigo", "Farinha Panko", "Feijão", "Feijão Branco", "Feijão Preto", "Fermento Biológico", "Fermento Pó-Royal", "Fubá", "Gelatina", "Gengibre em Pó", "Goiabada", "Grão de Bico", "Insulfime", "Leite Condensado", "Leite de Coco", "Louro", "Macarrão espaguete", "Macarrão parafuso", "Maionese normal", "Maionese Temperada", "Manjericão Seco", "Massa de Lasanha (Pré Cozida)", "Milho de Lata", "Molho de Tomate", "Molho Shoio", "Óleo de soja", "Orégano", "Ovos de codorna", "Ovos de codorna (Bandeja)", "Palmito de pupunha", "Papel Alumínio", "Papel Manteiga", "Papel Toalha", "Pessego em lata", "Pimenta do Reino", "Proteína de Soja", "Queijo Ralado", "Rap10", "Saco de Lixo grande 50 litros", "Saco de Lixo grande 100 litros", "Sal", "Sal Grosso", "Saquinhos", "Sardinha lata", "Suco de Saquinho de Limão", "Tapioca", "Tempero Baiano", "Tempero do Chef", "Tomilho", "Torradas", "Trigo para Quibe", "Uva Passa", "Vinagre", "Salsa seca", "Cebola em pó", "Vinho suave"],
+            "Diversos": ["Acendedor de Carvão", "Adaptador de Tomada", "Água Sanitária", "Alcool", "Álcool Spray", "Alicate", "Amaciante", "Amassador de Alho", "Ardósia", "Band Aid", "Bisnaga de Molhos", "Bombril", "Borrifador", "Bucha de Louça", "Camiseta de Uniforme", "Carvão", "Chocotone", "Chuveiro 220", "CIF Cremoso", "CIF derrete gordura", "Colher de Madeira", "Descascador de Legumes", "Desengordurante", "Desinfetante", "Detergente", "Diabo Verde", "Doce de Abóbora", "Doce de Batata", "Doce de Leite", "Durex", "Escova de Limpeza", "Escova de Privada", "Espátula de Silicone", "Esponja de louça", "Ferro de Passar", "Fita Adesiva", "Fita Isolante", "Forma de Gelo", "Forma de Hamburguer", "Frigideira", "Gancho", "Guardanapo de Pano", "Inseticida SBP", "Lâmpada", "Lixeira 50 litros", "Lustra móveis", "Luva de Limpeza", "Luva de Louça", "Mata Barata", "Panetone", "Pano de Chão", "Pano de Pia", "Pão Duro", "Papel Higiênico", "Papel Sulfite", "Pasta de Dente", "Pasta Lavar Panela", "Pastilha Piscina", "Pato (para privada)", "Pilha", "Pincel de Silicone", "Ponta da Mangueira", "Porta papel toalha", "Pote para detergente", "Querosene", "Ração", "Ralo de Pia", "Resistência", "Rodo e Vassoura", "Sabão em Pó", "Sabonete", "Sabonete Líquido", "Saco de Lixo", "Saleiro", "Sanito (para refeitório)", "Saquinho de Hamburguer", "Soda Cáustica", "Taça de Sobremesa", "Teta de Nega", "Torneira", "Touca (Cozinha)", "Vanish", "Vanish em barra para Roupa Colorida", "Veja Limpeza Pesada", "Veneno de Formiga em Gel", "Zap Clean Refil", "Bom air", "Desodorante"],
+            "Hortifruti": ["Abobrinha", "Acelga", "Alface", "Alho", "Alho Poró", "Batata", "Batata Doce", "Berinjela", "Beterraba", "Brócolis", "Broto de Feijão", "Cabotiá", "Cebola", "Cebola Roxa", "Cebolinha", "Cenoura", "Cheiro Verde", "Chicória", "Chuchu", "Couve Flor", "Couve", "Espinafre", "Gengibre", "Hortelã", "Mandioca", "Mandioca Palito Congelada", "Mandioquinha", "Mini cebola", "Pepino japonês", "Pimenta do Reino", "Pimentões", "Quiabo", "Repolho", "Rúcula", "Salsão", "Salsinha", "Tomate", "Tomate Cereja", "Tomate Seco", "Vagem"],
+            "Frutas": ["Abacaxi", "Ameixa", "Banana", "Goiaba", "Kiwi", "Laranja", "Limão", "Limão Siciliano", "Maçã", "Maçã verde", "Mamão", "Manga", "Maracujá", "Melancia", "Melão", "Morango", "Pêra", "Pêssego", "Uva Verde"],
+            "Carnes": ["Bacon em pedaço", "Bacon em tiras", "Bisteca Suína", "Brócolis congelado", "Carne Assada", "Carne Bovina (Lagarto)", "Carne Moída", "Carne para Bife", "Carne para Estrogonofe", "Carne para Panela", "Carne Seca Dianteiro", "Copa Lombo Grelhado", "Costela", "Costelinha Suína", "Cupim", "Filé de Peito de Frango", "Filé de Peixe", "Filé Mignon Suíno", "Linguiça Calabresa", "Linguiça Calabresa Fininha", "Linguiça de Paio", "Linguiça Toscana", "Lombo de Porco Salgado", "Paio", "Peito de Frango", "Pernil Suíno sem osso", "Rabada", "Salmão", "Sobrecoxa de Frango", "coxão mole", "Torresmo"],
+            "Frios": ["Anel de Cebola", "Hamburguer", "Iogurte", "Manteiga", "Mortadela", "Nuggets de Frango", "Pão de Queijo", "Pizza", "Presunto fatiado", "Queijo Meia Cura", "Queijo Minas Frescal", "Queijo Mussarela Fatiado", "Requeijão", "Sorvete", "Suco Natural", "Alho Descascado", "Banha", "Batata Frita", "Calabresa", "Catupiry", "Couve-Flor congelada", "Creme de Leite Fresco", "Massa de Pastel", "Nata", "Nhoque", "Parmesão Defumado", "Queijo Mussarela (peça)", "Rondelli", "Ovos (Cartela)"]
+        };
 
         function App() {
             const [aba, setAba] = useState('preparo');
-            
-            // LISTA INICIAL DE CATEGORIAS
-            const [categorias, setCategorias] = useState([
-                'Seminaristas', 'Geral', 'Diversos', 'Hortifruti', 'Frutas', 'Carnes', 'Frios'
-            ]);
-
-            // SEU BANCO DE DADOS DE PRODUTOS
-            const [inventario, setInventario] = useState([
-                // Seminaristas
-                {id: 1, nome: 'Achocolatado', cat: 'Seminaristas'}, {id: 2, nome: 'Acendedor', cat: 'Seminaristas'},
-                {id: 3, nome: 'Adoçante', cat: 'Seminaristas'}, {id: 4, nome: 'Aveia', cat: 'Seminaristas'},
-                {id: 5, nome: 'Barrinha de Cereal', cat: 'Seminaristas'}, {id: 6, nome: 'Biscoito Club Social', cat: 'Seminaristas'},
-                {id: 7, nome: 'Café', cat: 'Seminaristas'}, {id: 8, nome: 'Leite Normal', cat: 'Seminaristas'},
-                {id: 9, nome: 'Nescau Ball', cat: 'Seminaristas'}, {id: 10, nome: 'Refrigerante Coca-Cola', cat: 'Seminaristas'},
-                // Geral
-                {id: 11, nome: 'Açúcar Cristal', cat: 'Geral'}, {id: 12, nome: 'Arroz', cat: 'Geral'},
-                {id: 13, nome: 'Feijão', cat: 'Geral'}, {id: 14, nome: 'Óleo de soja', cat: 'Geral'},
-                {id: 15, nome: 'Macarrão espaguete', cat: 'Geral'}, {id: 16, nome: 'Sal', cat: 'Geral'},
-                // Hortifruti
-                {id: 17, nome: 'Alho', cat: 'Hortifruti'}, {id: 18, nome: 'Batata', cat: 'Hortifruti'},
-                {id: 19, nome: 'Cebola', cat: 'Hortifruti'}, {id: 20, nome: 'Tomate', cat: 'Hortifruti'},
-                // Carnes
-                {id: 21, nome: 'Carne Moída', cat: 'Carnes'}, {id: 22, nome: 'Frango (Peito)', cat: 'Carnes'},
-                // Frios
-                {id: 23, nome: 'Mussarela', cat: 'Frios'}, {id: 24, nome: 'Ovos (Cartela)', cat: 'Frios'}
-                // NOTA: Para brevidade no código, adicionei os principais. 
-                // Você pode adicionar o resto da sua lista manualmente no botão "Cadastrar" ou via código aqui.
-            ]);
-
-            const [listaCompra, setListaCompra] = useState([]);
-            const [novaCat, setNovaCat] = useState('');
+            const [listaCompra, setListaCompra] = useState({});
             const [busca, setBusca] = useState('');
 
-            // Lógica de Filtro
-            const inventarioFiltrado = useMemo(() => {
-                return inventario.filter(i => i.nome.toLowerCase().includes(busca.toLowerCase()));
-            }, [busca, inventario]);
+            useEffect(() => {
+                const ref = db.ref('compra_atual');
+                ref.on('value', (snapshot) => setListaCompra(snapshot.val() || {}));
+                return () => ref.off();
+            }, []);
 
-            // Funções
-            const toggleNaLista = (prod) => {
-                const existe = listaCompra.find(item => item.id === prod.id);
-                if (existe) {
-                    setListaCompra(listaCompra.filter(item => item.id !== prod.id));
+            const toggleItem = (nome, cat) => {
+                const id = btoa(unescape(encodeURIComponent(nome))).replace(/=/g, "");
+                if (listaCompra[id]) {
+                    db.ref(`compra_atual/${id}`).remove();
                 } else {
-                    setListaCompra([...listaCompra, { ...prod, qtd: 1, comprado: false }]);
+                    db.ref(`compra_atual/${id}`).set({ nome, cat, qtd: 1, comprado: false });
                 }
             };
 
-            const alterarQtd = (id, valor) => {
-                setListaCompra(listaCompra.map(i => {
-                    if (i.id === id) {
-                        const novaQtd = Math.max(1, i.qtd + valor);
-                        return { ...i, qtd: novaQtd };
-                    }
-                    return i;
-                }));
+            const mudarQtd = (id, n) => {
+                const novaQtd = Math.max(1, (listaCompra[id].qtd || 1) + n);
+                db.ref(`compra_atual/${id}`).update({ qtd: novaQtd });
             };
 
             const toggleComprado = (id) => {
-                setListaCompra(listaCompra.map(i => i.id === id ? {...i, comprado: !i.comprado} : i));
-            };
-
-            const addCategoria = () => {
-                if(novaCat && !categorias.includes(novaCat)) {
-                    setCategorias([...categorias, novaCat]);
-                    setNovaCat('');
-                }
+                db.ref(`compra_atual/${id}`).update({ comprado: !listaCompra[id].comprado });
             };
 
             return (
-                <div className="max-w-md mx-auto min-h-screen bg-slate-50 flex flex-col shadow-2xl overflow-hidden">
-                    {/* Header Fixo */}
-                    <header className="bg-indigo-700 text-white p-5 pt-8 shadow-lg text-center">
-                        <h1 className="text-xl font-black tracking-tighter">LISTA DA CASA 🏠</h1>
+                <div className="max-w-md mx-auto min-h-screen bg-white shadow-xl flex flex-col">
+                    <header className="bg-indigo-700 text-white p-6 text-center shadow-md">
+                        <h1 className="text-xl font-black uppercase tracking-widest">Lista da Casa</h1>
                     </header>
 
-                    {/* Navegação */}
-                    <nav className="flex bg-indigo-600 text-white font-bold text-[10px] uppercase tracking-widest">
-                        <button onClick={() => setAba('geral')} className={`flex-1 py-4 transition ${aba==='geral'?'bg-indigo-900 border-b-4 border-yellow-400':'opacity-70'}`}>Estoque</button>
-                        <button onClick={() => setAba('preparo')} className={`flex-1 py-4 transition ${aba==='preparo'?'bg-indigo-900 border-b-4 border-yellow-400':'opacity-70'}`}>Planejar</button>
-                        <button onClick={() => setAba('compras')} className={`flex-1 py-4 transition ${aba==='compras'?'bg-indigo-900 border-b-4 border-yellow-400':'opacity-70'}`}>🛒 Mercado</button>
+                    <nav className="flex bg-indigo-600 text-white font-bold text-xs">
+                        <button onClick={() => setAba('preparo')} className={`flex-1 py-4 transition ${aba==='preparo'?'bg-indigo-800 border-b-4 border-yellow-400':''}`}>PLANEJAR</button>
+                        <button onClick={() => setAba('compras')} className={`flex-1 py-4 transition ${aba==='compras'?'bg-indigo-800 border-b-4 border-yellow-400':''}`}>NO MERCADO</button>
                     </nav>
 
-                    {/* Conteúdo */}
-                    <main className="flex-1 p-4 overflow-y-auto ios-scroll">
-                        
-                        {/* BUSCA (Aparece em Planejar e Estoque) */}
-                        {aba !== 'compras' && (
-                            <input 
-                                type="text" 
-                                placeholder="🔍 Buscar produto..." 
-                                className="w-full p-3 mb-4 rounded-xl border-none shadow-inner bg-white"
-                                value={busca}
-                                onChange={e => setBusca(e.target.value)}
-                            />
-                        )}
-
-                        {/* ABA 1: GERENCIAR ESTOQUE/CATEGORIAS */}
-                        {aba === 'geral' && (
-                            <div className="space-y-6">
-                                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
-                                    <h3 className="text-xs font-bold text-slate-400 uppercase mb-3">Nova Categoria</h3>
-                                    <div className="flex gap-2">
-                                        <input value={novaCat} onChange={e => setNovaCat(e.target.value)} className="flex-1 bg-slate-100 p-2 rounded-lg outline-none" placeholder="Ex: Higiene" />
-                                        <button onClick={addCategoria} className="bg-indigo-600 text-white px-4 rounded-lg font-bold">+</button>
+                    <main className="flex-1 p-4 overflow-y-auto">
+                        {aba === 'preparo' ? (
+                            <div>
+                                <input placeholder="🔍 Buscar item..." className="w-full p-4 rounded-xl mb-6 bg-slate-100 border-none outline-none" onChange={e => setBusca(e.target.value)} />
+                                {Object.keys(LISTA_MUITO_LONGA).map(cat => (
+                                    <div key={cat} className="mb-6">
+                                        <h3 className="text-indigo-500 font-bold text-xs uppercase mb-2 ml-1">{cat}</h3>
+                                        {LISTA_MUITO_LONGA[cat].filter(i => i.toLowerCase().includes(busca.toLowerCase())).map(item => {
+                                            const id = btoa(unescape(encodeURIComponent(item))).replace(/=/g, "");
+                                            const selecionado = !!listaCompra[id];
+                                            return (
+                                                <div key={item} className={`flex items-center justify-between p-3 rounded-xl mb-1 border transition ${selecionado ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-100'}`}>
+                                                    <label className="flex items-center gap-3 flex-1 cursor-pointer">
+                                                        <input type="checkbox" checked={selecionado} onChange={() => toggleItem(item, cat)} className="w-5 h-5 accent-indigo-600" />
+                                                        <span className={selecionado ? "font-bold text-indigo-900" : "text-slate-600"}>{item}</span>
+                                                    </label>
+                                                    {selecionado && (
+                                                        <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-lg border shadow-sm font-bold">
+                                                            <button onClick={() => mudarQtd(id, -1)} className="px-2 text-indigo-600">-</button>
+                                                            <span className="text-xs">{listaCompra[id].qtd}</span>
+                                                            <button onClick={() => mudarQtd(id, 1)} className="px-2 text-indigo-600">+</button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
                                     </div>
-                                </div>
-                                <div className="space-y-1">
-                                    <h3 className="text-xs font-bold text-slate-400 uppercase mb-3 px-1">Itens Cadastrados ({inventario.length})</h3>
-                                    {inventarioFiltrado.map(i => (
-                                        <div key={i.id} className="flex justify-between bg-white p-3 rounded-lg text-sm border-b border-slate-100">
-                                            <span className="font-medium">{i.nome}</span>
-                                            <span className="text-[10px] bg-slate-100 px-2 py-1 rounded font-bold text-slate-500 uppercase">{i.cat}</span>
-                                        </div>
-                                    ))}
-                                </div>
+                                ))}
                             </div>
-                        )}
-
-                        {/* ABA 2: PLANEJAR COMPRA */}
-                        {aba === 'preparo' && (
-                            <div className="space-y-4">
-                                {categorias.map(cat => {
-                                    const itensDaCat = inventarioFiltrado.filter(p => p.cat === cat);
-                                    if(itensDaCat.length === 0) return null;
-                                    return (
-                                        <div key={cat} className="space-y-2">
-                                            <h4 className="text-xs font-black text-indigo-400 uppercase tracking-widest pl-1 mt-4">{cat}</h4>
-                                            {itensDaCat.map(i => {
-                                                const itemNaLista = listaCompra.find(lc => lc.id === i.id);
-                                                return (
-                                                    <div key={i.id} className={`flex items-center justify-between p-3 rounded-xl border transition ${itemNaLista ? 'bg-indigo-50 border-indigo-200 shadow-sm' : 'bg-white border-slate-100'}`}>
-                                                        <label className="flex items-center gap-3 cursor-pointer flex-1">
-                                                            <input type="checkbox" checked={!!itemNaLista} onChange={() => toggleNaLista(i)} className="w-5 h-5 rounded-full accent-indigo-600" />
-                                                            <span className={`text-sm ${itemNaLista ? 'font-bold text-indigo-900' : 'text-slate-600'}`}>{i.nome}</span>
-                                                        </label>
-                                                        {itemNaLista && (
-                                                            <div className="flex items-center gap-3 bg-white px-2 py-1 rounded-lg shadow-sm border border-indigo-100">
-                                                                <button onClick={() => alterarQtd(i.id, -1)} className="text-indigo-600 font-black px-1">-</button>
-                                                                <span className="font-bold text-sm min-w-[20px] text-center">{itemNaLista.qtd}</span>
-                                                                <button onClick={() => alterarQtd(i.id, 1)} className="text-indigo-600 font-black px-1">+</button>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-
-                        {/* ABA 3: MERCADO (CHECKOUT) */}
-                        {aba === 'compras' && (
+                        ) : (
                             <div className="space-y-3">
-                                <div className="flex justify-between items-end mb-6 bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
-                                    <div>
-                                        <p className="text-[10px] font-bold text-indigo-400 uppercase">Status da Compra</p>
-                                        <p className="text-2xl font-black text-indigo-900">{listaCompra.filter(i => i.comprado).length} / {listaCompra.length}</p>
-                                    </div>
-                                    <div className="w-24 bg-slate-200 h-2 rounded-full overflow-hidden">
-                                        <div className="bg-indigo-600 h-full transition-all" style={{width: `${(listaCompra.filter(i => i.comprado).length / (listaCompra.length || 1)) * 100}%`}}></div>
-                                    </div>
-                                </div>
-                                
-                                {listaCompra.sort((a,b) => a.cat.localeCompare(b.cat)).map(i => (
-                                    <div key={i.id} onClick={() => toggleComprado(i.id)} 
-                                        className={`p-4 rounded-2xl border-2 flex justify-between items-center transition-all duration-300 ${i.comprado ? 'bg-slate-100 border-transparent grayscale opacity-50' : 'bg-white border-white shadow-md active:scale-95'}`}>
-                                        <div className="flex items-center gap-4">
-                                            <div className={`text-2xl`}>{i.comprado ? '✅' : '⬜'}</div>
+                                {Object.keys(listaCompra).length === 0 && <p className="text-center text-slate-400 mt-20 italic">Sua lista está vazia.</p>}
+                                {Object.entries(listaCompra).sort((a,b) => a[1].cat.localeCompare(b[1].cat)).map(([id, item]) => (
+                                    <div key={id} onClick={() => toggleComprado(id)} className={`p-4 rounded-2xl border-2 flex justify-between items-center transition ${item.comprado ? 'bg-slate-50 border-transparent opacity-50 grayscale' : 'bg-white border-white shadow-lg active:scale-95'}`}>
+                                        <div className="flex gap-4 items-center">
+                                            <div className="text-2xl">{item.comprado ? '✅' : '⬜'}</div>
                                             <div>
-                                                <span className="text-[9px] font-black text-indigo-500 uppercase tracking-tighter">{i.cat}</span>
-                                                <p className={`text-lg leading-tight font-bold ${i.comprado ? 'line-through text-slate-500' : 'text-slate-800'}`}>{i.nome}</p>
+                                                <span className="text-[10px] font-bold text-indigo-500 uppercase">{item.cat}</span>
+                                                <p className={`text-lg font-bold leading-none ${item.comprado ? 'line-through text-slate-400' : ''}`}>{item.nome}</p>
                                             </div>
                                         </div>
-                                        <div className="bg-indigo-50 px-3 py-1 rounded-lg text-center">
-                                            <span className="block text-[8px] font-bold text-indigo-400 uppercase italic">Qtd</span>
-                                            <span className="text-lg font-black text-indigo-700">{i.qtd}</span>
+                                        <div className="bg-indigo-700 text-white px-3 py-1 rounded-lg font-black shadow-md">
+                                            <span className="block text-[8px] opacity-70 uppercase leading-none mb-1 text-center">Qtd</span>
+                                            <div className="text-lg leading-none">{item.qtd}</div>
                                         </div>
                                     </div>
                                 ))}
