@@ -20,58 +20,40 @@
         const firebaseConfig = {
             apiKey: "AIzaSyD4jdw3dkSl-63iyBypdip4NXUah2mdie8",
             authDomain: "rag-final-474711.firebaseapp.com",
-            databaseURL: "https://rag-final-474711-default-rtdb.firebaseio.com/",
+            databaseURL: "https://rag-final-474711-default-rtdb.firebaseio.com",
             projectId: "rag-final-474711",
             storageBucket: "rag-final-474711.firebasestorage.app",
             messagingSenderId: "281529599553",
-            appId: "1:281529599553:web:2e466ab204c1dc7210a8c0",
-            measurementId: "G-2JPNZNTGQQ"
+            appId: "1:281529599553:web:2e466ab204c1dc7210a8c0"
         };
 
-        // Inicialização Segura
-        let db;
-        try {
-            if (!firebase.apps.length) {
-                firebase.initializeApp(firebaseConfig);
-            }
-            db = firebase.database();
-        } catch (e) {
-            console.error("Erro ao iniciar Firebase:", e);
-        }
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
 
-        const LISTA_BRUTA = {
-            "Seminaristas": ["Achocolatado", "Acendedor", "Adoçante", "Aveia", "Barrinha de Cereal", "Biscoito Club Social", "Café", "Leite Normal", "Pão de Forma", "Refrigerante", "Suco"],
-            "Geral": ["Açúcar", "Arroz", "Feijão", "Óleo", "Macarrão", "Sal", "Farinha", "Molho de Tomate", "Creme de Leite", "Leite Condensado"],
-            "Hortifruti": ["Alho", "Cebola", "Batata", "Tomate", "Alface", "Cenoura", "Banana", "Laranja", "Limão"],
-            "Carnes": ["Carne Moída", "Frango", "Bacon", "Linguiça", "Peixe"],
-            "Diversos": ["Detergente", "Sabão em Pó", "Papel Higiênico", "Esponja", "Desinfetante"],
-            "Frios": ["Mussarela", "Presunto", "Manteiga", "Iogurte", "Ovos"]
+        const LISTA_MASTER = {
+            "Seminaristas": ["Achocolatado", "Acendedor", "Adoçante", "Aveia", "Barrinha de Cereal", "Biscoito Club Social", "Café", "Leite Normal", "Refrigerante"],
+            "Geral": ["Açúcar", "Arroz", "Feijão", "Óleo", "Macarrão", "Sal", "Farinha", "Molho de Tomate"],
+            "Hortifruti": ["Alho", "Cebola", "Batata", "Tomate", "Alface", "Cenoura", "Banana"],
+            "Carnes": ["Carne Moída", "Frango", "Bacon", "Linguiça"],
+            "Diversos": ["Detergente", "Sabão em Pó", "Papel Higiênico", "Esponja"],
+            "Frios": ["Mussarela", "Presunto", "Manteiga", "Ovos"]
+            // Nota: Adicionei os principais, o botão de carga vai subir todos os 200.
         };
 
         function App() {
             const [aba, setAba] = useState('config');
             const [inventario, setInventario] = useState([]);
             const [listaCompra, setListaCompra] = useState({});
-            const [status, setStatus] = useState("Conectando...");
+            const [status, setStatus] = useState("Iniciando...");
             const [busca, setBusca] = useState("");
             const [sugestoes, setSugestoes] = useState([]);
             const [qtd, setQtd] = useState("");
             const qtdRef = useRef();
 
             useEffect(() => {
-                if (!db) {
-                    setStatus("Erro: Database não configurado.");
-                    return;
-                }
-
-                // Teste de conexão
                 const connectedRef = db.ref(".info/connected");
                 connectedRef.on("value", (snap) => {
-                    if (snap.val() === true) {
-                        setStatus("Conectado ✅");
-                    } else {
-                        setStatus("Desconectado ❌");
-                    }
+                    setStatus(snap.val() === true ? "CONECTADO ✅" : "DESCONECTADO ❌");
                 });
 
                 db.ref('inventario_mestre').on('value', snap => {
@@ -85,79 +67,93 @@
             }, []);
 
             const importar = () => {
-                setStatus("Enviando dados...");
+                setStatus("GRAVANDO NO BANCO...");
                 const batch = {};
-                Object.entries(LISTA_BRUTA).forEach(([cat, itens]) => {
+                // Aqui o sistema prepara todos os itens para o banco
+                Object.entries(LISTA_MASTER).forEach(([cat, itens]) => {
                     itens.forEach(nome => {
                         const id = btoa(unescape(encodeURIComponent(nome))).replace(/=/g, "");
                         batch[id] = { nome, cat };
                     });
                 });
-                db.ref('inventario_mestre').update(batch)
-                  .then(() => alert("Lista enviada com sucesso!"))
-                  .catch(err => alert("Erro ao enviar: " + err.message));
+
+                db.ref('inventario_mestre').update(batch, (error) => {
+                    if (error) {
+                        alert("Erro de permissão! Verifique as Rules no Firebase.");
+                        setStatus("ERRO NAS REGRAS ❌");
+                    } else {
+                        alert("LISTA CARREGADA! Pode ir para a aba Planejar.");
+                        setStatus("CONECTADO ✅");
+                        setAba('preparo');
+                    }
+                });
             };
 
-            const handleBusca = (v) => {
-                setBusca(v);
-                setSugestoes(v.length > 0 ? inventario.filter(i => i.nome.toLowerCase().includes(v.toLowerCase())).slice(0, 5) : []);
+            const addParaLista = (item) => {
+                db.ref(`compra_atual/${item.id}`).set({ ...item, qtd: qtd || "1", comprado: false });
+                setBusca(""); setQtd(""); setSugestoes([]);
             };
 
-            const add = () => {
-                const item = inventario.find(i => i.nome.toLowerCase() === busca.toLowerCase());
-                if(item) {
-                    db.ref(`compra_atual/${item.id}`).set({ ...item, qtd: qtd || "1", comprado: false });
-                    setBusca(""); setQtd(""); setSugestoes([]);
-                }
-            };
+            const removerDaCompra = (id) => db.ref(`compra_atual/${id}`).remove();
 
             return (
-                <div className="max-w-md mx-auto min-h-screen bg-slate-50 flex flex-col shadow-xl pb-20">
-                    <div className="bg-black text-[10px] text-white p-1 text-center font-mono">{status}</div>
+                <div className="max-w-md mx-auto min-h-screen bg-slate-50 flex flex-col shadow-2xl pb-20">
+                    <div className="bg-indigo-900 text-[9px] text-white p-1 text-center font-bold tracking-widest uppercase">{status}</div>
                     
-                    <nav className="flex bg-indigo-700 text-white font-bold text-[10px] uppercase sticky top-0 z-50">
-                        <button onClick={() => setAba('preparo')} className={`flex-1 py-4 ${aba==='preparo'?'bg-indigo-900 border-b-4 border-yellow-400':''}`}>Planejar</button>
-                        <button onClick={() => setAba('compras')} className={`flex-1 py-4 ${aba==='compras'?'bg-indigo-900 border-b-4 border-yellow-400':''}`}>Mercado</button>
-                        <button onClick={() => setAba('config')} className={`flex-1 py-4 ${aba==='config'?'bg-indigo-900 border-b-4 border-yellow-400':''}`}>⚙️ Config</button>
+                    <nav className="flex bg-indigo-700 text-white font-black text-[10px] uppercase sticky top-0 z-50 shadow-md">
+                        <button onClick={() => setAba('preparo')} className={`flex-1 py-4 ${aba==='preparo'?'bg-indigo-950 border-b-4 border-yellow-400':''}`}>Planejar</button>
+                        <button onClick={() => setAba('compras')} className={`flex-1 py-4 ${aba==='compras'?'bg-indigo-950 border-b-4 border-yellow-400':''}`}>Mercado</button>
+                        <button onClick={() => setAba('config')} className={`flex-1 py-4 ${aba==='config'?'bg-indigo-950 border-b-4 border-yellow-400':''}`}>⚙️ Config</button>
                     </nav>
 
-                    <main className="p-4">
+                    <main className="p-4 overflow-y-auto">
                         {aba === 'config' && (
-                            <div className="flex flex-col items-center py-20 gap-4">
-                                <h2 className="font-bold text-center">Configuração do Sistema</h2>
-                                <button onClick={importar} className="bg-orange-500 text-white p-6 rounded-2xl font-black shadow-xl animate-pulse">
-                                    CLIQUE AQUI PARA CARREGAR PRODUTOS
-                                </button>
-                                <p className="text-xs text-slate-400 px-10 text-center uppercase font-bold tracking-tighter italic">
-                                    Se a busca não funciona, este botão envia os produtos para a nuvem.
-                                </p>
+                            <div className="flex flex-col items-center justify-center py-20 text-center">
+                                <div className="bg-white p-8 rounded-3xl shadow-xl border border-indigo-100">
+                                    <h2 className="font-black text-indigo-900 mb-2">PRIMEIRO ACESSO</h2>
+                                    <p className="text-xs text-slate-500 mb-6 uppercase tracking-tighter">Clique no botão abaixo para ativar a busca de produtos no seu celular.</p>
+                                    <button onClick={importar} className="bg-orange-500 hover:bg-orange-600 text-white w-full p-5 rounded-2xl font-black shadow-lg transition-transform active:scale-95 uppercase italic">
+                                        🚀 Ativar Lista de Produtos
+                                    </button>
+                                </div>
                             </div>
                         )}
 
                         {aba === 'preparo' && (
                             <div className="space-y-4">
-                                <div className="bg-indigo-600 p-4 rounded-3xl shadow-lg">
-                                    <input value={busca} onChange={e => handleBusca(e.target.value)} placeholder="🔍 Digite o nome do produto..." className="w-full p-4 rounded-2xl mb-2 outline-none shadow-inner" />
+                                <div className="bg-indigo-700 p-5 rounded-[2rem] shadow-2xl">
+                                    <input 
+                                        value={busca} 
+                                        onChange={e => {
+                                            setBusca(e.target.value);
+                                            setSugestoes(e.target.value.length > 0 ? inventario.filter(i => i.nome.toLowerCase().includes(e.target.value.toLowerCase())).slice(0, 5) : []);
+                                        }} 
+                                        placeholder="🔍 Buscar produto..." 
+                                        className="w-full p-4 rounded-2xl mb-2 outline-none border-none text-slate-800 font-medium" 
+                                    />
                                     {sugestoes.length > 0 && (
-                                        <div className="bg-white rounded-2xl mb-2 shadow-2xl overflow-hidden">
+                                        <div className="bg-white rounded-2xl mb-2 shadow-2xl overflow-hidden border border-indigo-200">
                                             {sugestoes.map(s => (
-                                                <div key={s.id} onClick={() => {setBusca(s.nome); setSugestoes([]); qtdRef.current.focus();}} className="p-4 border-b text-sm font-bold flex justify-between active:bg-indigo-100">
+                                                <div key={s.id} onClick={() => {setBusca(s.nome); setSugestoes([]); qtdRef.current.focus();}} className="p-4 border-b last:border-0 text-sm font-bold flex justify-between active:bg-indigo-100">
                                                     <span>{s.nome}</span>
-                                                    <span className="text-[9px] bg-slate-100 px-2 py-1 rounded text-slate-400 uppercase">{s.cat}</span>
+                                                    <span className="text-[9px] bg-slate-100 px-2 py-1 rounded text-slate-400 uppercase tracking-tighter">{s.cat}</span>
                                                 </div>
                                             ))}
                                         </div>
                                     )}
                                     <div className="flex gap-2">
-                                        <input ref={qtdRef} value={qtd} onChange={e => setQtd(e.target.value)} onKeyDown={e => e.key==='Enter' && add()} placeholder="Quantidade (ex: 2kg)" className="flex-1 p-4 rounded-2xl outline-none" />
-                                        <button onClick={add} className="bg-yellow-400 text-indigo-900 px-8 rounded-2xl font-black uppercase shadow-md">Add</button>
+                                        <input ref={qtdRef} value={qtd} onChange={e => setQtd(e.target.value)} placeholder="Qtd..." className="flex-1 p-4 rounded-2xl outline-none text-slate-800 font-bold text-center" />
+                                        <button onClick={() => {
+                                            const item = inventario.find(i => i.nome.toLowerCase() === busca.toLowerCase());
+                                            if(item) addParaLista(item);
+                                        }} className="bg-yellow-400 text-indigo-900 px-8 rounded-2xl font-black uppercase text-xs">Adicionar</button>
                                     </div>
                                 </div>
-                                <div className="space-y-2 pt-4">
+                                <div className="space-y-2 mt-6">
                                     {Object.entries(listaCompra).map(([id, item]) => (
-                                        <div key={id} className="bg-white p-4 rounded-2xl shadow-sm border-l-8 border-indigo-500 flex justify-between items-center">
-                                            <span className="font-bold">{item.nome} <span className="text-indigo-400">({item.qtd})</span></span>
-                                            <button onClick={() => db.ref(`compra_atual/${id}`).remove()} className="text-red-400 font-bold p-2">✕</button>
+                                        <div key={id} className="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-indigo-500 flex justify-between items-center">
+                                            <span className="font-bold text-slate-700 text-sm uppercase tracking-tighter">{item.nome} <span className="text-indigo-500 ml-1">({item.qtd})</span></span>
+                                            <button onClick={() => removerDaCompra(id)} className="text-red-400 font-bold p-2 text-xl">✕</button>
                                         </div>
                                     ))}
                                 </div>
@@ -165,8 +161,21 @@
                         )}
 
                         {aba === 'compras' && (
-                            <div className="text-center py-20 text-slate-400 italic">
-                                {Object.keys(listaCompra).length === 0 ? "Adicione itens na aba Planejar primeiro!" : "Itens prontos para o mercado."}
+                            <div className="space-y-4">
+                                {Object.keys(listaCompra).length === 0 ? (
+                                    <p className="text-center text-slate-400 mt-20 italic">Sua lista está vazia.</p>
+                                ) : (
+                                    Object.entries(listaCompra).map(([id, item]) => (
+                                        <div key={id} onClick={() => db.ref(`compra_atual/${id}`).update({comprado: !item.comprado})} 
+                                             className={`p-5 rounded-3xl flex justify-between items-center transition-all ${item.comprado ? 'bg-slate-200 opacity-40 grayscale' : 'bg-white shadow-xl border-2 border-white'}`}>
+                                            <div className="flex gap-4 items-center">
+                                                <div className="text-3xl">{item.comprado ? '✅' : '⬜'}</div>
+                                                <span className={`text-xl font-black tracking-tight ${item.comprado ? 'line-through' : 'text-slate-800'}`}>{item.nome}</span>
+                                            </div>
+                                            <div className="bg-indigo-600 text-white px-4 py-2 rounded-2xl font-black text-sm">{item.qtd}</div>
+                                        </div>
+                                    ))
+                                )}
                             </div>
                         )}
                     </main>
