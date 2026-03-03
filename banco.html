@@ -3,23 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3. Gestão de Produtos</title>
+    <title>3. Gestão (Modo Sobrevivência)</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-900 p-4 text-white">
     <div class="max-w-md mx-auto space-y-4">
-        <div class="flex justify-between items-center">
-            <a href="index.html" class="text-indigo-400 font-bold text-xs uppercase">← Voltar</a>
-            <h1 class="font-black uppercase tracking-tighter italic">Banco Mestre</h1>
-        </div>
+        <header class="flex justify-between items-center mb-6">
+            <a href="index.html" class="text-indigo-400 font-bold text-[10px] uppercase tracking-widest">← Voltar</a>
+            <h1 class="font-black uppercase tracking-tighter italic text-xl">Estoque Mestre</h1>
+        </header>
 
-        <div class="bg-slate-800 p-4 rounded-3xl border border-slate-700">
-            <input type="text" id="filtro" oninput="render()" placeholder="🔍 Pesquisar para editar..." class="w-full p-4 rounded-2xl bg-slate-900 text-white font-bold outline-none border border-slate-700">
-        </div>
-
-        <div id="container" class="space-y-3"></div>
+        <input type="text" id="filtro" oninput="render()" placeholder="Filtrar produtos..." class="w-full p-4 rounded-2xl bg-slate-800 border border-slate-700 outline-none font-bold">
+        
+        <div id="container" class="space-y-3 pt-4"></div>
     </div>
 
     <script>
@@ -36,26 +34,43 @@
         const db = firebase.database();
         let dados = [];
 
+        function limpar(s) { return s ? s.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : ""; }
+
         db.ref('inventario_mestre').on('value', s => {
-            const v = s.val() || {};
-            dados = Object.entries(v).map(([id, val]) => ({id, ...val}));
+            const raw = s.val() || {};
+            dados = [];
+            Object.keys(raw).forEach(key => {
+                const val = raw[key];
+                if(typeof val === 'object') {
+                    dados.push({id: key, nome: val.nome || "Sem Nome", cat: val.cat || "Geral"});
+                } else {
+                    dados.push({id: key, nome: val, cat: "Geral"});
+                }
+            });
             render();
         });
 
         function render() {
-            const f = document.getElementById('filtro').value.toLowerCase();
+            const t = limpar(document.getElementById('filtro').value);
             const box = document.getElementById('container');
             box.innerHTML = '';
             
-            dados.filter(i => i.nome.toLowerCase().includes(f)).slice(0, 15).forEach(item => {
+            const filtrados = dados.filter(i => limpar(i.nome).includes(t)).slice(0, 20);
+            
+            if(filtrados.length === 0) {
+                box.innerHTML = '<p class="text-center text-slate-500 font-bold uppercase text-[10px] py-10">Nenhum produto encontrado</p>';
+                return;
+            }
+
+            filtrados.forEach(item => {
                 const d = document.createElement('div');
-                d.className = "bg-slate-800 p-4 rounded-2xl border border-slate-700 space-y-2";
+                d.className = "bg-slate-800 p-4 rounded-2xl border border-slate-700";
                 d.innerHTML = `
-                    <div class="flex gap-2">
-                        <input type="text" value="${item.nome}" onblur="update('${item.id}', this.value, '${item.cat}')" class="flex-1 bg-slate-900 p-2 rounded-lg text-sm font-bold border-none outline-none">
-                        <button onclick="del('${item.id}')" class="text-red-500 font-bold px-2">✕</button>
+                    <div class="flex gap-2 mb-2">
+                        <input type="text" value="${item.nome}" onblur="db.ref('inventario_mestre/${item.id}').update({nome: this.value})" class="flex-1 bg-slate-900 p-2 rounded-lg text-sm font-bold outline-none border border-slate-700 focus:border-indigo-500">
+                        <button onclick="if(confirm('Apagar?')) db.ref('inventario_mestre/${item.id}').remove()" class="text-red-500 px-2 font-bold">✕</button>
                     </div>
-                    <select onchange="update('${item.id}', '${item.nome}', this.value)" class="w-full bg-slate-700 p-2 rounded-lg text-[10px] font-black uppercase text-slate-400 outline-none">
+                    <select onchange="db.ref('inventario_mestre/${item.id}').update({cat: this.value})" class="w-full bg-slate-700 p-2 rounded-lg text-[10px] font-black uppercase text-slate-300">
                         ${['Geral','Seminaristas','Hortifruti','Carnes','Diversos','Frios','Frutas'].map(c => 
                             `<option value="${c}" ${item.cat === c ? 'selected' : ''}>${c}</option>`
                         ).join('')}
@@ -64,9 +79,6 @@
                 box.appendChild(d);
             });
         }
-
-        function update(id, n, c) { db.ref('inventario_mestre/' + id).update({nome: n, cat: c}); }
-        function del(id) { if(confirm("Excluir item do estoque mestre?")) db.ref('inventario_mestre/' + id).remove(); }
     </script>
 </body>
 </html>
