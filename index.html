@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lista do Seminário - Versão PRO</title>
+    <title>Lista da Casa PRO</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -33,15 +33,27 @@
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
+        // LISTA MESTRE PARA IMPORTAÇÃO
+        const LISTA_INICIAL_COMPLETA = {
+            "Seminaristas": ["Achocolatado", "Acendedor", "Adoçante", "Aveia", "Barrinha de Cereal", "Biscoito Club Social", "Biscoito Club Social Integral", "Biscoito de rosquinha", "Café", "Caixa de Chocolate Lacta", "Catchup", "Cerveja", "Chás", "Chia", "Cobertura de Sorvete", "Farofa Temperada", "Filtro de Café (103)", "Fósforo grande", "Geléia", "Granola", "Guardanapo de Boca", "Iogurte Natural", "Leite em pó", "Leite Normal", "Leite Zero Lactose", "Linhaça", "Maionese tubo", "Mel", "Molho de Pimenta", "Mostarda", "Nescau Ball", "Paçoquinha", "Pacote de Sonho de Valsa", "Pão Caseiro, do padre ou outro", "Pão de Forma Tradicional", "Pão de Milho", "Pão para Hambúrguer", "Pipoca", "Refrigerante Coca-Cola", "Refrigerante Coca-Cola Zero", "Água com Gás", "Refrigerante Fanta", "Refrigerante Guaraná", "Refrigerante Sprite", "Suco Concentrado", "Suco Saquinho", "Sucrilhos", "Suspiro Pequeno", "Toalha de Papel (Mãos)", "Vinho tinto seco", "Wafer Chocolate", "Wafer Morango"],
+            "Geral": ["Açúcar Cristal", "Açúcar Refinado", "Açúcar Mascavo", "Alcaparra", "Alecrim", "Alho Frito", "Ameixa Seca", "Amêndoa Natural sem sal crua", "Amendoim", "Amido de Milho", "Arroz", "Azeite Vidro Verde", "Azeite Vidro Vermelho", "Azeitona sem caroço Inteira", "Azeitona sem caroço Picada", "Batata Palha", "Bolacha de Champagne", "Bolacha de Maisena", "Café Gourmet", "Canela em Pó", "Canjica", "Castanha de caju sem sal crua", "Cesta PADRE LUIZ", "Champignon", "Chocolate 100% Cacau", "Chocolate em pó 50 Melk", "Chocolate Branco", "Chocolate do padre", "Chocolate Granulado", "Chocolate Meio Amargo Barra", "Coco ralado", "Copo Plástico", "Creme de Cebola", "Creme de Leite", "Cuscuz de milho", "Cuscuz Marroquino", "Ervas Finas (Erva Doce)", "Ervilha", "Essência de Baunilha", "Extrato de Tomate Elefante", "Fardo de Refri", "Farinha de Mandioca Deusa", "Farinha de Milho", "Farinha de Rosca", "Farinha de Trigo", "Farinha Panko", "Feijão", "Feijão Branco", "Feijão Preto", "Fermento Biológico", "Fermento Pó-Royal", "Fubá", "Gelatina", "Gengibre em Pó", "Goiabada", "Grão de Bico", "Insulfime", "Leite Condensado", "Leite de Coco", "Louro", "Macarrão espaguete", "Macarrão parafuso", "Maionese normal", "Maionese Temperada", "Manjericão Seco", "Massa de Lasanha (Pré Cozida)", "Milho de Lata", "Molho de Tomate", "Molho Shoio", "Óleo de soja", "Orégano", "Ovos de codorna", "Ovos de codorna (Bandeja)", "Palmito de pupunha", "Papel Alumínio", "Papel Manteiga", "Papel Toalha", "Pessego em lata", "Pimenta do Reino", "Proteína de Soja", "Queijo Ralado", "Rap10", "Saco de Lixo grande 50 litros", "Saco de Lixo grande 100 litros", "Sal", "Sal Grosso", "Saquinhos", "Sardinha lata", "Suco de Saquinho de Limão", "Tapioca", "Tempero Baiano", "Tempero do Chef", "Tomilho", "Torradas", "Trigo para Quibe", "Uva Passa", "Vinagre", "Salsa seca", "Cebola em pó", "Vinho suave"],
+            "Diversos": ["Acendedor de Carvão", "Adaptador de Tomada", "Água Sanitária", "Alcool", "Álcool Spray", "Alicate", "Amaciante", "Amassador de Alho", "Ardósia", "Band Aid", "Bisnaga de Molhos", "Bombril", "Borrifador", "Bucha de Louça", "Camiseta de Uniforme", "Carvão", "Chocotone", "Chuveiro 220", "CIF Cremoso", "CIF derrete gordura", "Colher de Madeira", "Descascador de Legumes", "Desengordurante", "Desinfetante", "Detergente", "Diabo Verde", "Doce de Abóbora", "Doce de Batata", "Doce de Leite", "Durex", "Escova de Limpeza", "Escova de Privada", "Espátula de Silicone", "Esponja de louça", "Ferro de Passar", "Fita Adesiva", "Fita Isolante", "Forma de Gelo", "Forma de Hamburguer", "Frigideira", "Gancho", "Guardanapo de Pano", "Inseticida SBP", "Lâmpada", "Lixeira 50 litros", "Lustra móveis", "Luva de Limpeza", "Luva de Louça", "Mata Barata", "Panetone", "Pano de Chão", "Pano de Pia", "Pão Duro", "Papel Higiênico", "Papel Sulfite", "Pasta de Dente", "Pasta Lavar Panela", "Pastilha Piscina", "Pato (para privada)", "Pilha", "Pincel de Silicone", "Ponta da Mangueira", "Porta papel toalha", "Pote para detergente", "Querosene", "Ração", "Ralo de Pia", "Resistência", "Rodo e Vassoura", "Sabão em Pó", "Sabonete", "Sabonete Líquido", "Saco de Lixo", "Saleiro", "Sanito (para refeitório)", "Saquinho de Hamburguer", "Soda Cáustica", "Taça de Sobremesa", "Teta de Nega", "Torneira", "Touca (Cozinha)", "Vanish", "Vanish em barra para Roupa Colorida", "Veja Limpeza Pesada", "Veneno de Formiga em Gel", "Zap Clean Refil", "Bom air", "Desodorante"],
+            "Hortifruti": ["Abobrinha", "Acelga", "Alface", "Alho", "Alho Poró", "Batata", "Batata Docce", "Berinjela", "Beterraba", "Brócolis", "Broto de Feijão", "Cabotiá", "Cebola", "Cebola Roxa", "Cebolinha", "Cenoura", "Cheiro Verde", "Chicória", "Chuchu", "Couve Flor", "Couve", "Espinafre", "Gengibre", "Hortelã", "Mandioca", "Mandioca Palito Congelada", "Mandioquinha", "Mini cebola", "Pepino japonês", "Pimenta do Reino", "Pimentões", "Quiabo", "Repolho", "Rúcula", "Salsão", "Salsinha", "Tomate", "Tomate Cereja", "Tomate Seco", "Vagem"],
+            "Frutas": ["Abacaxi", "Ameixa", "Banana", "Goiaba", "Kiwi", "Laranja", "Limão", "Limão Siciliano", "Maçã", "Maçã verde", "Mamão", "Manga", "Maracujá", "Melancia", "Melão", "Morango", "Pêra", "Pêssego", "Uva Verde"],
+            "Carnes": ["Bacon em pedaço", "Bacon em tiras", "Bisteca Suína", "Brócolis congelado", "Carne Assada", "Carne Bovina (Lagarto)", "Carne Moída", "Carne para Bife", "Carne para Estrogonofe", "Carne para Panela", "Carne Seca Dianteiro", "Copa Lombo Grelhado", "Costela", "Costelinha Suína", "Cupim", "Filé de Peito de Frango", "Filé de Peixe", "Filé Mignon Suíno", "Linguiça Calabresa", "Linguiça Calabresa Fininha", "Linguiça de Paio", "Linguiça Toscana", "Lombo de Porco Salgado", "Paio", "Peito de Frango", "Pernil Suíno sem osso", "Rabada", "Salmão", "Sobrecoxa de Frango", "coxão mole", "Torresmo"],
+            "Frios": ["Anel de Cebola", "Hamburguer", "Iogurte", "Manteiga", "Mortadela", "Nuggets de Frango", "Pão de Queijo", "Pizza", "Presunto fatiado", "Queijo Meia Cura", "Queijo Minas Frescal", "Queijo Mussarela Fatiado", "Requeijão", "Sorvete", "Suco Natural", "Alho Descascado", "Banha", "Batata Frita", "Calabresa", "Catupiry", "Couve-Flor congelada", "Creme de Leite Fresco", "Massa de Pastel", "Nata", "Nhoque", "Parmesão Defumado", "Queijo Mussarela (peça)", "Rondelli", "Ovos (Cartela)"]
+        };
+
         function App() {
             const [aba, setAba] = useState('preparo');
             const [listaCompra, setListaCompra] = useState({});
-            const [categorias, setCategorias] = useState(["Seminaristas", "Geral", "Diversos", "Hortifruti", "Frutas", "Carnes", "Frios"]);
+            const [categorias, setCategorias] = useState([]);
             const [inventario, setInventario] = useState([]);
             
             const [novaCatInput, setNovaCatInput] = useState('');
             const [novoProdNome, setNovoProdNome] = useState('');
             const [novoProdCat, setNovoProdCat] = useState('Geral');
+            const [buscaMestre, setBuscaMestre] = useState('');
 
             const [inputBusca, setInputBusca] = useState('');
             const [inputQtd, setInputQtd] = useState('');
@@ -50,19 +62,34 @@
 
             useEffect(() => {
                 db.ref('compra_atual').on('value', snap => setListaCompra(snap.val() || {}));
-                db.ref('categorias').on('value', snap => { if(snap.val()) setCategorias(snap.val()); });
+                db.ref('categorias').on('value', snap => setCategorias(snap.val() || []));
                 db.ref('inventario_mestre').on('value', snap => {
                     const data = snap.val() || {};
-                    setInventario(Object.values(data));
+                    setInventario(Object.entries(data).map(([id, val]) => ({ id, ...val })));
                 });
             }, []);
 
-            const addCategoriaMestre = () => {
-                if(!novaCatInput) return;
-                const novas = [...categorias, novaCatInput];
-                db.ref('categorias').set(novas);
-                setNovaCatInput('');
+            // FUNÇÃO PARA SUBIR A LISTA ORIGINAL
+            const importarListaOriginal = () => {
+                if(window.confirm("Isso vai apagar seu inventário atual e carregar a lista original de 200 itens. Continuar?")) {
+                    const cats = Object.keys(LISTA_INICIAL_COMPLETA);
+                    db.ref('categorias').set(cats);
+                    
+                    const batch = {};
+                    Object.entries(LISTA_INICIAL_COMPLETA).forEach(([cat, itens]) => {
+                        itens.forEach(nome => {
+                            const id = btoa(unescape(encodeURIComponent(nome))).replace(/=/g, "");
+                            batch[id] = { nome, cat };
+                        });
+                    });
+                    db.ref('inventario_mestre').set(batch);
+                    alert("Lista original carregada!");
+                }
             };
+
+            const addCategoria = () => { if(novaCatInput) { db.ref('categorias').set([...categorias, novaCatInput]); setNovaCatInput(''); } };
+            const removerCategoria = (index) => { if(window.confirm("Remover categoria?")) { const n = [...categorias]; n.splice(index, 1); db.ref('categorias').set(n); } };
+            const removerProdutoMestre = (id) => { if(window.confirm("Remover este produto do inventário?")) db.ref(`inventario_mestre/${id}`).remove(); };
 
             const addProdutoMestre = () => {
                 if(!novoProdNome) return;
@@ -73,10 +100,7 @@
 
             const handleBusca = (val) => {
                 setInputBusca(val);
-                if (val.length > 1) {
-                    const filtered = inventario.filter(i => i.nome.toLowerCase().includes(val.toLowerCase())).slice(0, 5);
-                    setSugestoes(filtered);
-                } else { setSugestoes([]); }
+                setSugestoes(val.length > 1 ? inventario.filter(i => i.nome.toLowerCase().includes(val.toLowerCase())).slice(0, 5) : []);
             };
 
             const adicionarItemFinal = () => {
@@ -88,70 +112,62 @@
                 }
             };
 
-            const exportarPDF = () => {
-                const doc = new jsPDF();
-                doc.setFontSize(16);
-                doc.text("Lista de Compras Organizada", 20, 20);
-                let y = 30;
-                
-                const catsNaLista = [...new Set(Object.values(listaCompra).map(i => i.cat))].sort();
-                
-                catsNaLista.forEach(cat => {
-                    doc.setFontSize(12);
-                    doc.setFont("helvetica", "bold");
-                    doc.text(cat.toUpperCase(), 20, y);
-                    y += 7;
-                    doc.setFont("helvetica", "normal");
-                    doc.setFontSize(10);
-                    
-                    Object.values(listaCompra).filter(i => i.cat === cat).forEach(item => {
-                        doc.text(`[ ] ${item.nome} - ${item.qtd}`, 25, y);
-                        y += 6;
-                        if (y > 280) { doc.addPage(); y = 20; }
-                    });
-                    y += 4;
-                });
-                doc.save("lista-compras.pdf");
-            };
-
-            // Agrupamento para exibição no mercado
+            // Agrupamento
             const itensAgrupados = Object.entries(listaCompra).reduce((acc, [id, item]) => {
                 if (!acc[item.cat]) acc[item.cat] = [];
                 acc[item.cat].push({ id, ...item });
                 return acc;
             }, {});
 
-            const categoriasOrdenadas = Object.keys(itensAgrupados).sort();
-
             return (
                 <div className="max-w-md mx-auto min-h-screen bg-slate-50 flex flex-col shadow-2xl">
                     <nav className="flex bg-indigo-700 text-white font-bold text-[10px] sticky top-0 z-50 shadow-lg uppercase">
                         <button onClick={() => setAba('preparo')} className={`flex-1 py-4 ${aba==='preparo'?'bg-indigo-900 border-b-4 border-yellow-400':''}`}>Planejar</button>
                         <button onClick={() => setAba('compras')} className={`flex-1 py-4 ${aba==='compras'?'bg-indigo-900 border-b-4 border-yellow-400':''}`}>Mercado</button>
-                        <button onClick={() => setAba('config')} className={`flex-1 py-4 ${aba==='config'?'bg-indigo-900 border-b-4 border-yellow-400':''}`}>⚙️ Itens</button>
+                        <button onClick={() => setAba('config')} className={`flex-1 py-4 ${aba==='config'?'bg-indigo-900 border-b-4 border-yellow-400':''}`}>⚙️ Config</button>
                     </nav>
 
                     <main className="flex-1 p-4 overflow-y-auto pb-10">
                         {aba === 'config' && (
                             <div className="space-y-6">
-                                <section className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
-                                    <h3 className="text-xs font-black text-indigo-600 uppercase mb-4">Nova Categoria</h3>
-                                    <div className="flex gap-2">
-                                        <input value={novaCatInput} onChange={e => setNovaCatInput(e.target.value)} placeholder="Ex: Bebidas" className="flex-1 p-2 bg-slate-100 rounded-lg outline-none text-sm" />
-                                        <button onClick={addCategoriaMestre} className="bg-indigo-600 text-white px-4 rounded-lg font-bold">+</button>
+                                <button onClick={importarListaOriginal} className="w-full bg-amber-500 text-white p-3 rounded-xl font-bold text-xs uppercase shadow-md">⚠️ Carregar Lista Original (200 itens)</button>
+                                
+                                <section className="bg-white p-4 rounded-2xl shadow-sm border">
+                                    <h3 className="text-[10px] font-black text-indigo-600 uppercase mb-3 tracking-widest">Categorias</h3>
+                                    <div className="flex gap-2 mb-4">
+                                        <input value={novaCatInput} onChange={e => setNovaCatInput(e.target.value)} placeholder="Nova categoria..." className="flex-1 p-2 bg-slate-100 rounded-lg outline-none text-sm" />
+                                        <button onClick={addCategoria} className="bg-indigo-600 text-white px-4 rounded-lg">+</button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {categorias.map((c, idx) => (
+                                            <span key={idx} className="bg-slate-100 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-2 uppercase">
+                                                {c} <button onClick={() => removerCategoria(idx)} className="text-red-400 text-lg">×</button>
+                                            </span>
+                                        ))}
                                     </div>
                                 </section>
 
-                                <section className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
-                                    <h3 className="text-xs font-black text-indigo-600 uppercase mb-4">Novo Produto Mestre</h3>
-                                    <div className="flex flex-col gap-3">
-                                        <input value={novoProdNome} onChange={e => setNovoProdNome(e.target.value)} placeholder="Nome do produto..." className="p-2 bg-slate-100 rounded-lg outline-none text-sm" />
-                                        <div className="flex gap-2">
-                                            <select value={novoProdCat} onChange={e => setNovoProdCat(e.target.value)} className="flex-1 p-2 bg-slate-100 rounded-lg text-sm outline-none">
-                                                {categorias.map(c => <option key={c} value={c}>{c}</option>)}
-                                            </select>
-                                            <button onClick={addProdutoMestre} className="bg-indigo-600 text-white px-6 rounded-lg font-bold text-sm">Salvar</button>
-                                        </div>
+                                <section className="bg-white p-4 rounded-2xl shadow-sm border">
+                                    <h3 className="text-[10px] font-black text-indigo-600 uppercase mb-3 tracking-widest">Novo Produto</h3>
+                                    <input value={novoProdNome} onChange={e => setNovoProdNome(e.target.value)} placeholder="Nome..." className="w-full p-2 bg-slate-100 rounded-lg outline-none text-sm mb-2" />
+                                    <div className="flex gap-2">
+                                        <select value={novoProdCat} onChange={e => setNovoProdCat(e.target.value)} className="flex-1 p-2 bg-slate-100 rounded-lg text-sm">
+                                            {categorias.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                        <button onClick={addProdutoMestre} className="bg-indigo-600 text-white px-6 rounded-lg font-bold">Salvar</button>
+                                    </div>
+                                </section>
+
+                                <section>
+                                    <h3 className="text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest px-1 text-center">Pesquisar/Remover do Inventário</h3>
+                                    <input value={buscaMestre} onChange={e => setBuscaMestre(e.target.value)} placeholder="🔍 Buscar para remover..." className="w-full p-3 rounded-xl border-none shadow-sm mb-4" />
+                                    <div className="space-y-1">
+                                        {inventario.filter(i => i.nome.toLowerCase().includes(buscaMestre.toLowerCase())).slice(0, 15).map(i => (
+                                            <div key={i.id} className="flex justify-between items-center bg-white p-2 px-4 rounded-lg text-xs shadow-sm border border-slate-50">
+                                                <span>{i.nome} <small className="text-slate-300 uppercase">({i.cat})</small></span>
+                                                <button onClick={() => removerProdutoMestre(i.id)} className="text-red-300 font-bold text-lg p-1">🗑️</button>
+                                            </div>
+                                        ))}
                                     </div>
                                 </section>
                             </div>
@@ -159,33 +175,37 @@
 
                         {aba === 'preparo' && (
                             <div className="space-y-4">
-                                <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 relative shadow-inner">
-                                    <p className="text-[10px] font-bold text-indigo-400 uppercase mb-2 text-center tracking-widest">Montar Compra do Dia</p>
+                                <div className="bg-indigo-600 p-5 rounded-3xl shadow-xl text-white">
+                                    <p className="text-[10px] font-bold opacity-70 uppercase mb-3 tracking-widest">O que falta em casa?</p>
                                     <div className="flex flex-col gap-3">
                                         <div className="relative">
-                                            <input value={inputBusca} onChange={e => handleBusca(e.target.value)} placeholder="Buscar produto..." className="w-full p-3 rounded-xl outline-none text-sm shadow-sm" />
+                                            <input value={inputBusca} onChange={e => handleBusca(e.target.value)} placeholder="Digite o produto..." className="w-full p-3 rounded-xl outline-none text-sm text-slate-800" />
                                             {sugestoes.length > 0 && (
-                                                <div className="absolute top-full left-0 right-0 bg-white shadow-2xl rounded-b-xl z-30 border mt-1">
+                                                <div className="absolute top-full left-0 right-0 bg-white shadow-2xl rounded-xl z-30 border mt-2 overflow-hidden">
                                                     {sugestoes.map(s => (
-                                                        <div key={s.nome} onClick={() => {setInputBusca(s.nome); setSugestoes([]); qtdRef.current.focus();}} className="p-3 hover:bg-indigo-50 cursor-pointer border-b text-sm flex justify-between">
+                                                        <div key={s.nome} onClick={() => {setInputBusca(s.nome); setSugestoes([]); qtdRef.current.focus();}} className="p-4 hover:bg-indigo-50 cursor-pointer border-b text-slate-800 text-sm flex justify-between">
                                                             <span className="font-bold">{s.nome}</span>
-                                                            <span className="text-[9px] text-slate-400 uppercase">{s.cat}</span>
+                                                            <span className="text-[9px] bg-slate-100 px-2 py-1 rounded text-slate-500 uppercase">{s.cat}</span>
                                                         </div>
                                                     ))}
                                                 </div>
                                             )}
                                         </div>
                                         <div className="flex gap-2">
-                                            <input ref={qtdRef} placeholder="Qtd (Ex: 2kg, 3un)" value={inputQtd} onChange={e => setInputQtd(e.target.value)} onKeyDown={e => e.key === 'Enter' && adicionarItemFinal()} className="flex-1 p-3 bg-white rounded-xl outline-none text-sm font-bold shadow-sm" />
-                                            <button onClick={adicionarItemFinal} className="bg-indigo-600 text-white px-8 rounded-xl font-bold shadow-md">Add</button>
+                                            <input ref={qtdRef} placeholder="Qtd (un, kg, L...)" value={inputQtd} onChange={e => setInputQtd(e.target.value)} onKeyDown={e => e.key === 'Enter' && adicionarItemFinal()} className="flex-1 p-3 bg-white rounded-xl outline-none text-sm font-bold text-slate-800" />
+                                            <button onClick={adicionarItemFinal} className="bg-yellow-400 text-indigo-900 px-8 rounded-xl font-black shadow-md active:scale-95 transition">ADICIONAR</button>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="space-y-2 mt-4">
+                                <div className="space-y-2 mt-6">
+                                    <h3 className="text-xs font-black text-slate-400 uppercase ml-2 tracking-widest">Na Lista de Hoje:</h3>
                                     {Object.entries(listaCompra).map(([id, item]) => (
-                                        <div key={id} className="flex justify-between items-center p-3 bg-white border border-slate-100 rounded-xl shadow-sm">
-                                            <span className="font-bold text-slate-700 text-sm">{item.nome} <small className="text-indigo-400 font-black">({item.qtd})</small></span>
-                                            <button onClick={() => db.ref(`compra_atual/${id}`).remove()} className="text-red-400 font-bold px-2 text-lg">✕</button>
+                                        <div key={id} className="flex justify-between items-center p-3 bg-white border-l-4 border-indigo-500 rounded-r-xl shadow-sm">
+                                            <div>
+                                                <p className="text-[8px] font-black text-indigo-400 uppercase">{item.cat}</p>
+                                                <p className="font-bold text-slate-700">{item.nome} <span className="text-indigo-600 italic">({item.qtd})</span></p>
+                                            </div>
+                                            <button onClick={() => db.ref(`compra_atual/${id}`).remove()} className="text-red-400 p-2 text-xl">✕</button>
                                         </div>
                                     ))}
                                 </div>
@@ -193,27 +213,29 @@
                         )}
 
                         {aba === 'compras' && (
-                            <div className="space-y-6">
-                                <div className="flex gap-2 mb-2 sticky top-2 z-10">
-                                    <button onClick={exportarPDF} className="flex-1 bg-indigo-600 text-white p-2 rounded-xl text-[10px] font-bold uppercase shadow-lg">Exportar PDF</button>
-                                    <button onClick={() => window.confirm("Zerar carrinho?") && db.ref('compra_atual').remove()} className="flex-1 bg-red-100 text-red-600 p-2 rounded-xl text-[10px] font-bold uppercase shadow-sm">Zerar Lista</button>
+                            <div className="space-y-6 pb-20">
+                                <div className="flex gap-2 sticky top-2 z-10 p-1 bg-slate-50">
+                                    <button onClick={() => {
+                                        const doc = new jsPDF();
+                                        doc.text("LISTA DE COMPRAS", 20, 20);
+                                        let y = 30;
+                                        Object.values(listaCompra).forEach(i => { doc.text(`[ ] ${i.nome} (${i.qtd}) - ${i.cat}`, 20, y); y+=8; });
+                                        doc.save("lista.pdf");
+                                    }} className="flex-1 bg-white border border-indigo-200 text-indigo-600 p-3 rounded-2xl text-[10px] font-bold uppercase shadow-sm">Baixar PDF</button>
+                                    <button onClick={() => window.confirm("Zerar?") && db.ref('compra_atual').remove()} className="flex-1 bg-red-50 text-red-600 p-3 rounded-2xl text-[10px] font-bold uppercase shadow-sm">Zerar Carrinho</button>
                                 </div>
 
-                                {categoriasOrdenadas.map(cat => (
+                                {Object.keys(itensAgrupados).sort().map(cat => (
                                     <div key={cat} className="space-y-2">
-                                        <div className="flex items-center gap-2 px-1">
-                                            <div className="h-[2px] flex-1 bg-indigo-100"></div>
-                                            <h2 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{cat}</h2>
-                                            <div className="h-[2px] flex-1 bg-indigo-100"></div>
-                                        </div>
+                                        <h2 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] text-center pt-4">{cat}</h2>
                                         {itensAgrupados[cat].map((item) => (
                                             <div key={item.id} onClick={() => db.ref(`compra_atual/${item.id}`).update({comprado: !item.comprado})} 
-                                                className={`p-4 rounded-2xl border-2 flex justify-between items-center transition-all ${item.comprado ? 'bg-slate-100 border-transparent opacity-50' : 'bg-white border-white shadow-md active:scale-95'}`}>
+                                                className={`p-5 rounded-3xl border-2 flex justify-between items-center transition-all ${item.comprado ? 'bg-slate-100 border-transparent opacity-40 grayscale scale-95' : 'bg-white border-white shadow-xl active:scale-90'}`}>
                                                 <div className="flex gap-4 items-center">
-                                                    <div className="text-2xl">{item.comprado ? '✅' : '⬜'}</div>
-                                                    <p className={`text-lg font-bold leading-tight ${item.comprado ? 'line-through text-slate-400' : 'text-slate-800'}`}>{item.nome}</p>
+                                                    <div className="text-3xl">{item.comprado ? '✅' : '⬜'}</div>
+                                                    <p className={`text-xl font-bold ${item.comprado ? 'line-through text-slate-400' : 'text-slate-800'}`}>{item.nome}</p>
                                                 </div>
-                                                <div className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-lg font-black text-xs">{item.qtd}</div>
+                                                <div className="bg-indigo-600 text-white px-4 py-2 rounded-2xl font-black text-sm shadow-md">{item.qtd}</div>
                                             </div>
                                         ))}
                                     </div>
