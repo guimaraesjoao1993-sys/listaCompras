@@ -3,21 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3. Gestão (Modo Sobrevivência)</title>
+    <title>Gestão do Estoque</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-900 p-4 text-white">
-    <div class="max-w-md mx-auto space-y-4">
-        <header class="flex justify-between items-center mb-6">
-            <a href="index.html" class="text-indigo-400 font-bold text-[10px] uppercase tracking-widest">← Voltar</a>
-            <h1 class="font-black uppercase tracking-tighter italic text-xl">Estoque Mestre</h1>
+<body class="bg-slate-900 p-4 text-white pb-20">
+    <div class="max-w-md mx-auto space-y-6">
+        <header class="flex justify-between items-center">
+            <a href="index.html" class="text-indigo-400 font-bold text-[10px] uppercase">← Painel</a>
+            <h1 class="font-black uppercase italic text-xl">Administrar Banco</h1>
         </header>
 
-        <input type="text" id="filtro" oninput="render()" placeholder="Filtrar produtos..." class="w-full p-4 rounded-2xl bg-slate-800 border border-slate-700 outline-none font-bold">
-        
-        <div id="container" class="space-y-3 pt-4"></div>
+        <div class="bg-slate-800 p-6 rounded-[2rem] border border-slate-700 shadow-xl">
+            <h2 class="text-[10px] font-black uppercase text-indigo-400 mb-3 tracking-widest">Novo Produto</h2>
+            <input type="text" id="novo-nome" placeholder="Nome do produto..." class="w-full p-4 rounded-xl bg-slate-900 border border-slate-700 mb-3 outline-none font-bold">
+            
+            <div class="flex gap-2 mb-4">
+                <select id="nova-cat-select" class="flex-1 bg-slate-900 p-4 rounded-xl border border-slate-700 text-sm font-bold outline-none"></select>
+            </div>
+            
+            <button onclick="cadastrarProduto()" class="w-full bg-indigo-600 p-4 rounded-xl font-black uppercase text-xs shadow-lg active:scale-95 transition-all">Salvar no Estoque</button>
+        </div>
+
+        <div class="bg-slate-800 p-6 rounded-[2rem] border border-slate-700">
+            <h2 class="text-[10px] font-black uppercase text-indigo-400 mb-3 tracking-widest">Criar Categoria</h2>
+            <div class="flex gap-2">
+                <input type="text" id="nova-cat-nome" placeholder="Nome da categoria..." class="flex-1 p-3 rounded-xl bg-slate-900 border border-slate-700 outline-none text-sm">
+                <button onclick="cadastrarCategoria()" class="bg-emerald-600 px-4 rounded-xl font-bold">+</button>
+            </div>
+            <div id="lista-categorias-gestao" class="flex flex-wrap gap-2 mt-4"></div>
+        </div>
+
+        <div class="pt-4">
+            <input type="text" id="filtro" oninput="renderProdutos()" placeholder="🔍 Pesquisar para editar..." class="w-full p-4 rounded-2xl bg-slate-800 border border-slate-700 outline-none font-bold mb-4">
+            <div id="container-produtos" class="space-y-3"></div>
+        </div>
     </div>
 
     <script>
@@ -32,51 +53,85 @@
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-        let dados = [];
+
+        let produtos = [];
+        let categorias = ["Geral", "Seminaristas", "Hortifruti", "Carnes", "Diversos", "Frios", "Frutas"];
 
         function limpar(s) { return s ? s.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : ""; }
 
-        db.ref('inventario_mestre').on('value', s => {
-            const raw = s.val() || {};
-            dados = [];
-            Object.keys(raw).forEach(key => {
-                const val = raw[key];
-                if(typeof val === 'object') {
-                    dados.push({id: key, nome: val.nome || "Sem Nome", cat: val.cat || "Geral"});
-                } else {
-                    dados.push({id: key, nome: val, cat: "Geral"});
-                }
-            });
-            render();
+        // Sincronizar Categorias
+        db.ref('categorias').on('value', s => {
+            const val = s.val();
+            if(val) categorias = Object.values(val);
+            atualizarMenusCategoria();
         });
 
-        function render() {
+        // Sincronizar Produtos
+        db.ref('inventario_mestre').on('value', s => {
+            const raw = s.val() || {};
+            produtos = Object.entries(raw).map(([id, v]) => ({
+                id, 
+                nome: typeof v === 'object' ? v.nome : v, 
+                cat: v.cat || "Geral"
+            }));
+            renderProdutos();
+        });
+
+        function atualizarMenusCategoria() {
+            const select = document.getElementById('nova-cat-select');
+            select.innerHTML = categorias.map(c => `<option value="${c}">${c}</option>`).join('');
+            
+            const gestao = document.getElementById('lista-categorias-gestao');
+            gestao.innerHTML = categorias.map(c => `
+                <span class="bg-slate-700 px-3 py-1 rounded-full text-[10px] font-bold flex items-center gap-2">
+                    ${c} <button onclick="removerCategoria('${c}')" class="text-red-400">✕</button>
+                </span>
+            `).join('');
+            renderProdutos();
+        }
+
+        function cadastrarCategoria() {
+            const nome = document.getElementById('nova-cat-nome').value.trim();
+            if(!nome || categorias.includes(nome)) return;
+            const id = btoa(unescape(encodeURIComponent(nome))).replace(/=/g, "");
+            db.ref('categorias/' + id).set(nome);
+            document.getElementById('nova-cat-nome').value = '';
+        }
+
+        function removerCategoria(nome) {
+            if(confirm(`Remover categoria "${nome}"?`)) {
+                const id = btoa(unescape(encodeURIComponent(nome))).replace(/=/g, "");
+                db.ref('categorias/' + id).remove();
+            }
+        }
+
+        function cadastrarProduto() {
+            const nome = document.getElementById('novo-nome').value.trim();
+            const cat = document.getElementById('nova-cat-select').value;
+            if(!nome) return;
+            const id = btoa(unescape(encodeURIComponent(nome))).replace(/=/g, "");
+            db.ref('inventario_mestre/' + id).set({ nome, cat });
+            document.getElementById('novo-nome').value = '';
+        }
+
+        function renderProdutos() {
             const t = limpar(document.getElementById('filtro').value);
-            const box = document.getElementById('container');
+            const box = document.getElementById('container-produtos');
             box.innerHTML = '';
             
-            const filtrados = dados.filter(i => limpar(i.nome).includes(t)).slice(0, 20);
-            
-            if(filtrados.length === 0) {
-                box.innerHTML = '<p class="text-center text-slate-500 font-bold uppercase text-[10px] py-10">Nenhum produto encontrado</p>';
-                return;
-            }
-
-            filtrados.forEach(item => {
-                const d = document.createElement('div');
-                d.className = "bg-slate-800 p-4 rounded-2xl border border-slate-700";
-                d.innerHTML = `
+            produtos.filter(p => limpar(p.nome).includes(t)).slice(0, 15).forEach(p => {
+                const div = document.createElement('div');
+                div.className = "bg-slate-800 p-4 rounded-2xl border border-slate-700";
+                div.innerHTML = `
                     <div class="flex gap-2 mb-2">
-                        <input type="text" value="${item.nome}" onblur="db.ref('inventario_mestre/${item.id}').update({nome: this.value})" class="flex-1 bg-slate-900 p-2 rounded-lg text-sm font-bold outline-none border border-slate-700 focus:border-indigo-500">
-                        <button onclick="if(confirm('Apagar?')) db.ref('inventario_mestre/${item.id}').remove()" class="text-red-500 px-2 font-bold">✕</button>
+                        <input type="text" value="${p.nome}" onblur="db.ref('inventario_mestre/${p.id}').update({nome: this.value})" class="flex-1 bg-slate-900 p-2 rounded-lg text-sm font-bold border-none outline-none">
+                        <button onclick="if(confirm('Apagar?')) db.ref('inventario_mestre/${p.id}').remove()" class="text-red-500 font-bold px-2">✕</button>
                     </div>
-                    <select onchange="db.ref('inventario_mestre/${item.id}').update({cat: this.value})" class="w-full bg-slate-700 p-2 rounded-lg text-[10px] font-black uppercase text-slate-300">
-                        ${['Geral','Seminaristas','Hortifruti','Carnes','Diversos','Frios','Frutas'].map(c => 
-                            `<option value="${c}" ${item.cat === c ? 'selected' : ''}>${c}</option>`
-                        ).join('')}
+                    <select onchange="db.ref('inventario_mestre/${p.id}').update({cat: this.value})" class="w-full bg-slate-700 p-2 rounded-lg text-[10px] font-black uppercase text-slate-300">
+                        ${categorias.map(c => `<option value="${c}" ${p.cat === c ? 'selected' : ''}>${c}</option>`).join('')}
                     </select>
                 `;
-                box.appendChild(d);
+                box.appendChild(div);
             });
         }
     </script>
