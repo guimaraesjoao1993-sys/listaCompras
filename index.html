@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Lista da Casa PRO</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -11,7 +11,7 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-100 font-sans">
     <div id="root"></div>
 
     <script type="text/babel">
@@ -40,88 +40,135 @@
             const [filtroEdit, setFiltroEdit] = useState("");
 
             useEffect(() => {
-                // Carrega inventário apenas se necessário (otimização de memória)
-                const invRef = db.ref('inventario_mestre');
-                invRef.on('value', snap => {
+                // Carregamento único e estável
+                db.ref('inventario_mestre').on('value', snap => {
                     const val = snap.val() || {};
                     setInventario(Object.entries(val).map(([id, v]) => ({ id, ...v })));
                 });
-
-                const listRef = db.ref('compra_atual');
-                listRef.on('value', snap => setListaCompra(snap.val() || {}));
-
-                return () => { invRef.off(); listRef.off(); };
+                db.ref('compra_atual').on('value', snap => setListaCompra(snap.val() || {}));
             }, []);
 
-            // Lógica de busca segura
+            // Busca otimizada (Só filtra quando você digita, sem interferir no resto)
             const sugestoes = useMemo(() => {
-                if (aba !== 'preparo' || busca.length < 2) return [];
-                return inventario.filter(i => i.nome.toLowerCase().includes(busca.toLowerCase())).slice(0, 5);
-            }, [busca, inventario, aba]);
+                const termo = busca.trim().toLowerCase();
+                if (termo.length < 2) return [];
+                return inventario.filter(i => i.nome.toLowerCase().includes(termo)).slice(0, 5);
+            }, [busca, inventario]);
 
-            const add = (nome, cat) => {
+            const addItem = (nome, cat) => {
+                if(!nome) return;
                 const id = btoa(unescape(encodeURIComponent(nome))).replace(/=/g, "");
                 db.ref(`compra_atual/${id}`).set({
                     nome, cat: cat || "Geral", qtd: qtd || "1", obs: obs || "", comprado: false
                 }).then(() => { setBusca(""); setQtd(""); setObs(""); });
             };
 
+            const itensNoCarrinho = Object.values(listaCompra).reduce((acc, item) => {
+                if (!acc[item.cat]) acc[item.cat] = [];
+                acc[item.cat].push(item);
+                return acc;
+            }, {});
+
             return (
                 <div className="max-w-md mx-auto min-h-screen bg-white shadow-2xl flex flex-col">
+                    {/* Menu Superior - Abas fixas para evitar travamentos */}
                     <nav className="flex bg-indigo-700 text-white font-bold text-[10px] uppercase sticky top-0 z-50 shadow-lg">
                         <button onClick={() => setAba('preparo')} className={`flex-1 py-4 ${aba==='preparo'?'bg-indigo-900 border-b-4 border-yellow-400':''}`}>1. Planejar</button>
                         <button onClick={() => setAba('compras')} className={`flex-1 py-4 ${aba==='compras'?'bg-indigo-900 border-b-4 border-yellow-400':''}`}>2. Mercado</button>
                         <button onClick={() => setAba('editar')} className={`flex-1 py-4 ${aba==='editar'?'bg-indigo-900 border-b-4 border-yellow-400':''}`}>3. Banco</button>
                     </nav>
 
-                    <main className="p-4 flex-1 overflow-y-auto">
+                    <main className="p-4 flex-1 overflow-y-auto pb-20">
+                        
+                        {/* ABA 1: PLANEJAMENTO */}
                         {aba === 'preparo' && (
                             <div className="space-y-4">
-                                <div className="bg-slate-100 p-4 rounded-2xl border">
-                                    <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="🔍 Digite o produto..." className="w-full p-3 rounded-lg border-none outline-none font-bold mb-2 shadow-sm" />
-                                    {sugestoes.map(s => (
-                                        <div key={s.id} onClick={() => {setBusca(s.nome);}} className="p-3 bg-white border rounded mb-1 text-xs flex justify-between cursor-pointer">
-                                            <b>{s.nome}</b> <span className="opacity-40">{s.cat}</span>
+                                <div className="bg-slate-100 p-4 rounded-3xl border border-indigo-100">
+                                    <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="🔍 Nome do produto..." className="w-full p-3 rounded-xl mb-1 outline-none font-bold shadow-sm" />
+                                    <div className="space-y-1 mb-2">
+                                        {sugestoes.map(s => (
+                                            <div key={s.id} onClick={() => {setBusca(s.nome);}} className="p-3 bg-white border rounded-lg text-xs flex justify-between cursor-pointer active:bg-indigo-50">
+                                                <span className="font-bold">{s.nome}</span> <span className="opacity-40">{s.cat}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input value={qtd} onChange={e => setQtd(e.target.value)} placeholder="Qtd" className="w-20 p-2 rounded-lg outline-none font-bold border" />
+                                        <input value={obs} onChange={e => setObs(e.target.value)} placeholder="Observação (marca, etc)..." className="flex-1 p-2 rounded-lg outline-none italic text-xs border" />
+                                    </div>
+                                    <button onClick={() => addItem(busca, "Geral")} className="w-full mt-3 bg-indigo-600 text-white font-bold py-3 rounded-xl uppercase text-[10px] shadow-md active:scale-95 transition-all">Adicionar à Lista</button>
+                                </div>
+                                <div className="space-y-2">
+                                    {Object.entries(listaCompra).map(([id, item]) => (
+                                        <div key={id} className="p-3 bg-white border-b flex justify-between items-center text-xs">
+                                            <div>
+                                                <p className="font-bold uppercase">{item.nome} ({item.qtd})</p>
+                                                {item.obs && <p className="text-indigo-500 italic text-[10px]">{item.obs}</p>}
+                                            </div>
+                                            <button onClick={() => db.ref(`compra_atual/${id}`).remove()} className="text-red-400 p-2 text-lg font-bold">✕</button>
                                         </div>
                                     ))}
-                                    <div className="flex gap-2">
-                                        <input value={qtd} onChange={e => setQtd(e.target.value)} placeholder="Qtd" className="w-20 p-2 rounded-lg outline-none font-bold" />
-                                        <input value={obs} onChange={e => setObs(e.target.value)} placeholder="Obs..." className="flex-1 p-2 rounded-lg outline-none italic text-xs" />
-                                    </div>
-                                    <button onClick={() => add(busca, "Geral")} className="w-full mt-3 bg-indigo-600 text-white font-bold py-3 rounded-xl uppercase text-[10px]">Adicionar</button>
                                 </div>
-                                {Object.entries(listaCompra).map(([id, item]) => (
-                                    <div key={id} className="p-3 border-b flex justify-between items-center text-xs">
-                                        <span><b>{item.nome}</b> ({item.qtd})</span>
-                                        <button onClick={() => db.ref(`compra_atual/${id}`).remove()} className="text-red-400 px-2">✕</button>
+                            </div>
+                        )}
+
+                        {/* ABA 2: MERCADO */}
+                        {aba === 'compras' && (
+                            <div className="space-y-6">
+                                <button onClick={() => confirm("Zerar lista?") && db.ref('compra_atual').remove()} className="w-full bg-red-50 text-red-600 p-2 rounded-xl text-[10px] font-black uppercase mb-4">Limpar Lista</button>
+                                {Object.keys(itensNoCarrinho).sort().map(cat => (
+                                    <div key={cat} className="space-y-2">
+                                        <h3 className="text-[10px] font-black text-indigo-400 uppercase text-center border-b pb-1 tracking-widest">{cat}</h3>
+                                        {itensNoCarrinho[cat].map(item => {
+                                            const id = btoa(unescape(encodeURIComponent(item.nome))).replace(/=/g, "");
+                                            return (
+                                                <div key={id} onClick={() => db.ref(`compra_atual/${id}`).update({comprado: !item.comprado})} className={`p-4 rounded-xl border flex justify-between items-center ${item.comprado ? 'bg-gray-50 opacity-40 grayscale shadow-none' : 'bg-white shadow border border-slate-100 active:bg-indigo-50'}`}>
+                                                    <div className="flex gap-4 items-center">
+                                                        <div className="text-xl">{item.comprado ? '✅' : '⬜'}</div>
+                                                        <div>
+                                                            <span className={`text-base font-bold ${item.comprado ? 'line-through text-gray-400' : 'text-gray-800'}`}>{item.nome}</span>
+                                                            {item.obs && !item.comprado && <p className="text-[10px] text-indigo-500 italic">{item.obs}</p>}
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-indigo-700 text-white px-2 py-1 rounded font-bold text-[10px]">{item.qtd}</div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 ))}
                             </div>
                         )}
 
-                        {aba === 'compras' && (
-                            <div className="space-y-4 pb-20">
-                                {Object.values(listaCompra).map(item => {
-                                    const id = btoa(unescape(encodeURIComponent(item.nome))).replace(/=/g, "");
-                                    return (
-                                        <div key={id} onClick={() => db.ref(`compra_atual/${id}`).update({comprado: !item.comprado})} className={`p-4 rounded-xl border flex justify-between items-center ${item.comprado ? 'bg-gray-100 opacity-40' : 'bg-white shadow'}`}>
-                                            <span className={`font-bold ${item.comprado ? 'line-through' : ''}`}>{item.nome} ({item.qtd})</span>
-                                            <span>{item.comprado ? '✅' : '⬜'}</span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-
+                        {/* ABA 3: BANCO (EDIÇÃO) - Aqui a edição é protegida */}
                         {aba === 'editar' && (
                             <div className="space-y-4">
                                 <input value={filtroEdit} onChange={e => setFiltroEdit(e.target.value)} placeholder="🔍 Filtrar no banco..." className="w-full p-3 border-2 rounded-lg outline-none font-bold" />
                                 {inventario.filter(i => i.nome.toLowerCase().includes(filtroEdit.toLowerCase())).slice(0, 10).map(item => (
-                                    <div key={item.id} className="p-3 bg-white border rounded-xl flex flex-col gap-2">
+                                    <div key={item.id} className="p-3 bg-white border rounded-xl shadow-sm flex flex-col gap-2">
                                         <div className="flex gap-2">
-                                            <input defaultValue={item.nome} onBlur={e => db.ref(`inventario_mestre/${item.id}`).update({nome: e.target.value})} className="flex-1 font-bold p-1 bg-gray-50 rounded" />
-                                            <button onClick={() => confirm("Excluir?") && db.ref(`inventario_mestre/${item.id}`).remove()} className="text-red-400">✕</button>
+                                            {/* Edição simples por clique */}
+                                            <input 
+                                                defaultValue={item.nome} 
+                                                onBlur={e => {
+                                                    if(e.target.value !== item.nome) db.ref(`inventario_mestre/${item.id}`).update({nome: e.target.value});
+                                                }} 
+                                                className="flex-1 font-bold p-1 bg-gray-50 rounded text-sm border" 
+                                            />
+                                            <button onClick={() => confirm("Excluir do banco?") && db.ref(`inventario_mestre/${item.id}`).remove()} className="text-red-400 font-bold px-2">✕</button>
                                         </div>
+                                        <select 
+                                            value={item.cat} 
+                                            onChange={e => db.ref(`inventario_mestre/${item.id}`).update({cat: e.target.value})} 
+                                            className="p-1 bg-gray-100 rounded text-[10px] uppercase font-bold text-gray-500 border"
+                                        >
+                                            <option value="Geral">Geral</option>
+                                            <option value="Seminaristas">Seminaristas</option>
+                                            <option value="Hortifruti">Hortifruti</option>
+                                            <option value="Carnes">Carnes</option>
+                                            <option value="Diversos">Diversos</option>
+                                            <option value="Frios">Frios</option>
+                                            <option value="Frutas">Frutas</option>
+                                        </select>
                                     </div>
                                 ))}
                             </div>
