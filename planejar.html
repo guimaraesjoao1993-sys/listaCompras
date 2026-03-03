@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1. Planejar Compra</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-indigo-50 p-4">
+    <div class="max-w-md mx-auto space-y-4">
+        <h1 class="text-center font-black text-indigo-900 uppercase tracking-tighter text-xl">Planejar Compra</h1>
+        
+        <div class="bg-white p-6 rounded-[2.5rem] shadow-xl border-2 border-indigo-100">
+            <input type="text" id="busca" oninput="filtrar()" placeholder="🔍 O que falta?" class="w-full p-4 rounded-2xl mb-2 font-bold bg-slate-100 outline-none border-none">
+            <div id="sugestoes" class="space-y-1 mb-2"></div>
+            
+            <div class="flex gap-2">
+                <input type="text" id="qtd" placeholder="Qtd" class="w-20 p-3 rounded-xl border bg-slate-50 font-bold outline-none">
+                <input type="text" id="obs" placeholder="Obs..." class="flex-1 p-3 rounded-xl border bg-slate-50 italic text-sm outline-none">
+            </div>
+            <button onclick="add()" class="w-full mt-4 bg-indigo-600 text-white font-black py-4 rounded-2xl uppercase shadow-lg active:scale-95 transition-all">Adicionar à Lista</button>
+        </div>
+
+        <div id="lista" class="space-y-2 pt-4"></div>
+        <a href="mercado.html" class="block text-center text-indigo-500 font-bold text-xs underline mt-4 uppercase tracking-widest">Ir para o Mercado →</a>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyD4jdw3dkSl-63iyBypdip4NXUah2mdie8",
+            authDomain: "rag-final-474711.firebaseapp.com",
+            databaseURL: "https://rag-final-474711-default-rtdb.firebaseio.com",
+            projectId: "rag-final-474711",
+            storageBucket: "rag-final-474711.firebasestorage.app",
+            messagingSenderId: "281529599553",
+            appId: "1:281529599553:web:2e466ab204c1dc7210a8c0"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        let mestre = [];
+
+        db.ref('inventario_mestre').on('value', s => {
+            const val = s.val() || {};
+            mestre = Object.values(val);
+        });
+
+        db.ref('compra_atual').on('value', s => {
+            const val = s.val() || {};
+            const container = document.getElementById('lista');
+            container.innerHTML = '<h3 class="text-[10px] font-black text-slate-400 uppercase ml-4 mb-2">Itens Planejados:</h3>';
+            Object.entries(val).forEach(([id, item]) => {
+                const d = document.createElement('div');
+                d.className = "p-4 bg-white rounded-2xl shadow-sm flex justify-between items-center border-l-8 border-indigo-400";
+                d.innerHTML = `<div><b class="text-xs uppercase">${item.nome} (${item.qtd})</b><p class="text-[10px] text-indigo-400 italic">${item.obs || ''}</p></div>
+                               <button onclick="firebase.database().ref('compra_atual/${id}').remove()" class="text-red-300 font-bold p-2 text-xl">✕</button>`;
+                container.appendChild(d);
+            });
+        });
+
+        function filtrar() {
+            const t = document.getElementById('busca').value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const b = document.getElementById('sugestoes');
+            b.innerHTML = '';
+            if(t.length < 1) return;
+            mestre.filter(i => i.nome.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(t)).slice(0,5).forEach(s => {
+                const d = document.createElement('div');
+                d.className = "p-3 bg-white border rounded-xl text-sm font-bold flex justify-between active:bg-indigo-100 cursor-pointer mb-1";
+                d.innerHTML = `${s.nome} <span class="opacity-30 uppercase text-[9px]">${s.cat}</span>`;
+                d.onclick = () => { document.getElementById('busca').value = s.nome; b.innerHTML = ''; document.getElementById('qtd').focus(); };
+                b.appendChild(d);
+            });
+        }
+
+        function add() {
+            const n = document.getElementById('busca').value;
+            if(!n) return;
+            const id = btoa(unescape(encodeURIComponent(n))).replace(/=/g, "");
+            const item = mestre.find(i => i.nome === n);
+            db.ref('compra_atual/' + id).set({ nome: n, qtd: document.getElementById('qtd').value || "1", obs: document.getElementById('obs').value || "", cat: item ? item.cat : "Geral", comprado: false });
+            document.getElementById('busca').value = ''; document.getElementById('qtd').value = ''; document.getElementById('obs').value = '';
+        }
+    </script>
+</body>
+</html>
