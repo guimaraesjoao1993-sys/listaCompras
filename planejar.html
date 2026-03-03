@@ -3,30 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>1. Planejar Compra</title>
+    <title>1. Planejar (Modo Sobrevivência)</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-indigo-50 p-4 pb-20">
-    <div class="max-w-md mx-auto space-y-4">
-        <div class="flex justify-between items-center">
-            <a href="index.html" class="text-indigo-400 font-bold text-[10px] uppercase">← Painel</a>
-            <h1 class="font-black text-indigo-900 uppercase text-lg">Planejar</h1>
-        </div>
-        
-        <div class="bg-white p-6 rounded-[2.5rem] shadow-xl border-2 border-indigo-100">
-            <input type="text" id="busca" oninput="filtrar()" placeholder="🔍 O que falta? (ex: pao)" class="w-full p-4 rounded-2xl mb-2 font-bold bg-slate-100 outline-none">
-            <div id="sugestoes" class="space-y-1 mb-2 max-h-48 overflow-y-auto"></div>
+<body class="bg-indigo-50 p-4 pb-24">
+    <div class="max-w-md mx-auto">
+        <div class="bg-white p-6 rounded-[2rem] shadow-2xl border-2 border-indigo-200">
+            <h2 class="text-center font-black uppercase text-indigo-900 mb-4 tracking-tighter">O que vamos comprar?</h2>
             
-            <div class="flex gap-2">
-                <input type="text" id="qtd" placeholder="Qtd" class="w-20 p-3 rounded-xl border bg-slate-50 font-bold outline-none">
-                <input type="text" id="obs" placeholder="Obs..." class="flex-1 p-3 rounded-xl border bg-slate-50 italic text-sm outline-none">
+            <input type="text" id="busca" oninput="filtrar()" placeholder="Pesquisar produto..." class="w-full p-4 rounded-xl bg-slate-100 font-bold outline-none border-2 border-transparent focus:border-indigo-500">
+            
+            <div id="sugestoes" class="mt-1 space-y-1 max-h-60 overflow-y-auto"></div>
+            
+            <div class="flex gap-2 mt-3">
+                <input type="text" id="qtd" placeholder="Qtd" class="w-20 p-3 rounded-xl border-2 border-slate-100 font-bold outline-none">
+                <input type="text" id="obs" placeholder="Obs/Marca..." class="flex-1 p-3 rounded-xl border-2 border-slate-100 italic text-sm outline-none">
             </div>
-            <button onclick="add()" class="w-full mt-4 bg-indigo-600 text-white font-black py-4 rounded-2xl uppercase shadow-lg active:scale-95 transition-all">Adicionar à Lista</button>
+
+            <button onclick="add(document.getElementById('busca').value)" class="w-full mt-4 bg-indigo-600 text-white font-black py-4 rounded-2xl uppercase shadow-lg active:bg-indigo-800 transition-all">
+                Adicionar na Marra 🚀
+            </button>
+            <p class="text-[9px] text-center mt-2 text-slate-400 font-bold uppercase">Se não achar na busca, digite acima e clique no botão</p>
         </div>
 
-        <div id="lista" class="space-y-2 pt-4"></div>
+        <div id="lista" class="mt-8 space-y-2"></div>
     </div>
 
     <script>
@@ -43,25 +45,31 @@
         const db = firebase.database();
         let mestre = [];
 
-        // FUNÇÃO DE LIMPEZA (IGUINORA ACENTOS)
-        function limpar(str) {
-            return str.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        }
+        function limpar(s) { return s ? s.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : ""; }
 
+        // MODO SOBREVIVÊNCIA: Força a leitura de qualquer formato
         db.ref('inventario_mestre').on('value', s => {
-            const val = s.val() || {};
-            mestre = Object.entries(val).map(([id, v]) => ({ id, ...v }));
+            const raw = s.val() || {};
+            mestre = [];
+            Object.keys(raw).forEach(key => {
+                const item = raw[key];
+                if (typeof item === 'object') {
+                    mestre.push({ id: key, nome: item.nome || "Sem Nome", cat: item.cat || "Geral" });
+                } else {
+                    mestre.push({ id: key, nome: item, cat: "Geral" });
+                }
+            });
         });
 
         db.ref('compra_atual').on('value', s => {
             const val = s.val() || {};
             const container = document.getElementById('lista');
-            container.innerHTML = '<h3 class="text-[10px] font-black text-slate-400 uppercase ml-4 mb-2">Lista Atual:</h3>';
+            container.innerHTML = '';
             Object.entries(val).forEach(([id, item]) => {
                 const d = document.createElement('div');
-                d.className = "p-4 bg-white rounded-2xl shadow-sm flex justify-between items-center border-l-8 border-indigo-400 mb-2";
+                d.className = "p-4 bg-white rounded-2xl shadow flex justify-between items-center border-l-4 border-indigo-500 mb-2";
                 d.innerHTML = `<div><b class="text-xs uppercase">${item.nome} (${item.qtd})</b><p class="text-[10px] text-indigo-400 italic">${item.obs || ''}</p></div>
-                               <button onclick="firebase.database().ref('compra_atual/${id}').remove()" class="text-red-300 font-bold p-2 text-xl">✕</button>`;
+                               <button onclick="db.ref('compra_atual/${id}').remove()" class="text-red-300 font-bold p-2">✕</button>`;
                 container.appendChild(d);
             });
         });
@@ -72,28 +80,28 @@
             b.innerHTML = '';
             if(t.length < 1) return;
 
-            mestre.filter(i => limpar(i.nome).includes(t)).slice(0, 6).forEach(s => {
+            mestre.filter(i => limpar(i.nome).includes(t)).slice(0, 8).forEach(s => {
                 const d = document.createElement('div');
-                d.className = "p-4 bg-white border-2 border-indigo-50 rounded-xl text-sm font-bold flex justify-between active:bg-indigo-100 cursor-pointer mb-1";
-                d.innerHTML = `<span>${s.nome}</span> <span class="opacity-30 uppercase text-[9px]">${s.cat}</span>`;
-                d.onclick = () => { document.getElementById('busca').value = s.nome; b.innerHTML = ''; document.getElementById('qtd').focus(); };
+                d.className = "p-4 bg-white border-b-2 border-indigo-50 text-sm font-bold flex justify-between cursor-pointer active:bg-indigo-50";
+                d.innerHTML = `${s.nome} <span class="text-[9px] opacity-30 uppercase">${s.cat}</span>`;
+                d.onclick = () => { add(s.nome, s.cat); b.innerHTML = ''; };
                 b.appendChild(d);
             });
         }
 
-        function add() {
-            const n = document.getElementById('busca').value;
-            if(!n) return;
-            const id = btoa(unescape(encodeURIComponent(n))).replace(/=/g, "");
-            const itemOriginal = mestre.find(i => i.nome === n);
-            db.ref('compra_atual/' + id).set({ 
-                nome: n, 
-                qtd: document.getElementById('qtd').value || "1", 
-                obs: document.getElementById('obs').value || "", 
-                cat: itemOriginal ? itemOriginal.cat : "Geral", 
-                comprado: false 
+        function add(nome, catInput) {
+            if(!nome) return;
+            const id = btoa(unescape(encodeURIComponent(nome))).replace(/=/g, "");
+            db.ref('compra_atual/' + id).set({
+                nome: nome,
+                qtd: document.getElementById('qtd').value || "1",
+                obs: document.getElementById('obs').value || "",
+                cat: catInput || "Geral",
+                comprado: false
             });
-            document.getElementById('busca').value = ''; document.getElementById('qtd').value = ''; document.getElementById('obs').value = '';
+            document.getElementById('busca').value = '';
+            document.getElementById('qtd').value = '';
+            document.getElementById('obs').value = '';
         }
     </script>
 </body>
