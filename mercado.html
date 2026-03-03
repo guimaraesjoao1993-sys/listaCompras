@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2. Lista de Mercado</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-4 pb-20">
+    <div class="max-w-md mx-auto space-y-6">
+        <h1 class="text-center font-black text-gray-800 uppercase tracking-tighter text-xl">No Mercado</h1>
+        <button onclick="if(confirm('Zerar?')) firebase.database().ref('compra_atual').remove()" class="w-full bg-red-100 text-red-600 p-2 rounded-xl text-[10px] font-bold uppercase">Limpar Lista</button>
+        <div id="container" class="space-y-6"></div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyD4jdw3dkSl-63iyBypdip4NXUah2mdie8",
+            authDomain: "rag-final-474711.firebaseapp.com",
+            databaseURL: "https://rag-final-474711-default-rtdb.firebaseio.com",
+            projectId: "rag-final-474711",
+            storageBucket: "rag-final-474711.firebasestorage.app",
+            messagingSenderId: "281529599553",
+            appId: "1:281529599553:web:2e466ab204c1dc7210a8c0"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        db.ref('compra_atual').on('value', s => {
+            const val = s.val() || {};
+            const box = document.getElementById('container');
+            box.innerHTML = '';
+            const cats = {};
+            Object.values(val).forEach(i => { if(!cats[i.cat]) cats[i.cat] = []; cats[i.cat].push(i); });
+            
+            Object.keys(cats).sort().forEach(c => {
+                const sec = document.createElement('div');
+                sec.innerHTML = `<h3 class="text-[10px] font-black text-indigo-400 uppercase text-center border-b pb-1 mb-2">${c}</h3>`;
+                cats[c].forEach(item => {
+                    const id = btoa(unescape(encodeURIComponent(item.nome))).replace(/=/g, "");
+                    const div = document.createElement('div');
+                    div.className = `p-5 rounded-[2rem] flex justify-between items-center mb-2 transition-all ${item.comprado ? 'bg-gray-200 opacity-40 grayscale scale-95' : 'bg-white shadow-lg'}`;
+                    div.onclick = () => db.ref('compra_atual/' + id).update({comprado: !item.comprado});
+                    div.innerHTML = `<div class="flex gap-4 items-center">
+                                        <div class="text-2xl">${item.comprado ? '✅' : '⬜'}</div>
+                                        <div><b class="text-lg ${item.comprado ? 'line-through text-gray-500' : ''}">${item.nome}</b>
+                                        ${item.obs ? `<p class="text-[10px] text-indigo-500 italic">${item.obs}</p>` : ''}</div>
+                                     </div>
+                                     <div class="bg-indigo-700 text-white px-3 py-1 rounded-xl font-bold text-xs">${item.qtd}</div>`;
+                    sec.appendChild(div);
+                });
+                box.appendChild(sec);
+            });
+        });
+    </script>
+</body>
+</html>
