@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>1. Planejar (Modo Sobrevivência)</title>
+    <title>1. Planejar (Ajustado)</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -18,14 +18,13 @@
             <div id="sugestoes" class="mt-1 space-y-1 max-h-60 overflow-y-auto"></div>
             
             <div class="flex gap-2 mt-3">
-                <input type="text" id="qtd" placeholder="Qtd" class="w-20 p-3 rounded-xl border-2 border-slate-100 font-bold outline-none">
-                <input type="text" id="obs" placeholder="Obs/Marca..." class="flex-1 p-3 rounded-xl border-2 border-slate-100 italic text-sm outline-none">
+                <input type="text" id="qtd" placeholder="Qtd" class="w-20 p-3 rounded-xl border-2 border-slate-100 font-bold outline-none bg-white">
+                <input type="text" id="obs" placeholder="Obs/Marca..." class="flex-1 p-3 rounded-xl border-2 border-slate-100 italic text-sm outline-none bg-white">
             </div>
 
-            <button onclick="add(document.getElementById('busca').value)" class="w-full mt-4 bg-indigo-600 text-white font-black py-4 rounded-2xl uppercase shadow-lg active:bg-indigo-800 transition-all">
-                Adicionar na Marra 🚀
+            <button onclick="salvarNoFirebase()" class="w-full mt-4 bg-indigo-600 text-white font-black py-4 rounded-2xl uppercase shadow-lg active:bg-indigo-800 transition-all">
+                Adicionar à Lista 🚀
             </button>
-            <p class="text-[9px] text-center mt-2 text-slate-400 font-bold uppercase">Se não achar na busca, digite acima e clique no botão</p>
         </div>
 
         <div id="lista" class="mt-8 space-y-2"></div>
@@ -44,10 +43,10 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
         let mestre = [];
+        let categoriaSelecionada = "Geral"; // Armazena a categoria do item clicado
 
         function limpar(s) { return s ? s.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : ""; }
 
-        // MODO SOBREVIVÊNCIA: Força a leitura de qualquer formato
         db.ref('inventario_mestre').on('value', s => {
             const raw = s.val() || {};
             mestre = [];
@@ -84,24 +83,45 @@
                 const d = document.createElement('div');
                 d.className = "p-4 bg-white border-b-2 border-indigo-50 text-sm font-bold flex justify-between cursor-pointer active:bg-indigo-50";
                 d.innerHTML = `${s.nome} <span class="text-[9px] opacity-30 uppercase">${s.cat}</span>`;
-                d.onclick = () => { add(s.nome, s.cat); b.innerHTML = ''; };
+                
+                // NOVO: Ao clicar, apenas preenche os campos e foca na Quantidade
+                d.onclick = () => { 
+                    document.getElementById('busca').value = s.nome;
+                    categoriaSelecionada = s.cat; 
+                    b.innerHTML = ''; 
+                    document.getElementById('qtd').focus(); 
+                };
                 b.appendChild(d);
             });
         }
 
-        function add(nome, catInput) {
-            if(!nome) return;
+        // Função que realmente salva no banco de dados
+        function salvarNoFirebase() {
+            const nome = document.getElementById('busca').value;
+            const qtd = document.getElementById('qtd').value || "1";
+            const obs = document.getElementById('obs').value || "";
+            
+            if(!nome) {
+                alert("Digite ou selecione um produto primeiro!");
+                return;
+            }
+
             const id = btoa(unescape(encodeURIComponent(nome))).replace(/=/g, "");
+            
             db.ref('compra_atual/' + id).set({
                 nome: nome,
-                qtd: document.getElementById('qtd').value || "1",
-                obs: document.getElementById('obs').value || "",
-                cat: catInput || "Geral",
+                qtd: qtd,
+                obs: obs,
+                cat: categoriaSelecionada,
                 comprado: false
+            }).then(() => {
+                // Limpa tudo após salvar
+                document.getElementById('busca').value = '';
+                document.getElementById('qtd').value = '';
+                document.getElementById('obs').value = '';
+                categoriaSelecionada = "Geral";
+                document.getElementById('busca').focus();
             });
-            document.getElementById('busca').value = '';
-            document.getElementById('qtd').value = '';
-            document.getElementById('obs').value = '';
         }
     </script>
 </body>
