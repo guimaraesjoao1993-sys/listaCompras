@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista de Compras da Casa</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function App() {
+            const [aba, setAba] = useState('geral');
+            const [inventario, setInventario] = useState(() => JSON.parse(localStorage.getItem('inv')) || []);
+            const [listaCompra, setListaCompra] = useState(() => JSON.parse(localStorage.getItem('lista')) || []);
+            const [novoItem, setNovoItem] = useState({ nome: '', cat: 'Outros' });
+
+            // Persistência local (para teste enquanto não configuramos o Firebase)
+            useEffect(() => {
+                localStorage.setItem('inv', JSON.stringify(inventario));
+                localStorage.setItem('lista', JSON.stringify(listaCompra));
+            }, [inventario, listaCompra]);
+
+            const addInventario = () => {
+                if(!novoItem.nome) return;
+                setInventario([...inventario, { ...novoItem, id: Date.now() }]);
+                setNovoItem({ nome: '', cat: 'Outros' });
+            };
+
+            const toggleNaLista = (prod) => {
+                const existe = listaCompra.find(i => i.id === prod.id);
+                if (existe) {
+                    setListaCompra(listaCompra.filter(i => i.id !== prod.id));
+                } else {
+                    setListaCompra([...listaCompra, { ...prod, qtd: 1, comprado: false }]);
+                }
+            };
+
+            const checkItem = (id) => {
+                setListaCompra(listaCompra.map(i => i.id === id ? {...i, comprado: !i.comprado} : i));
+            };
+
+            return (
+                <div class="max-w-md mx-auto min-h-screen bg-white shadow-lg flex flex-col">
+                    <header class="bg-blue-600 text-white p-4 text-center font-bold text-xl">🛒 Compras da Casa</header>
+                    
+                    <nav class="flex bg-blue-500 text-white text-sm">
+                        <button onClick={() => setAba('geral')} class={`flex-1 p-3 ${aba==='geral'?'bg-blue-700':''}`}>1. Itens</button>
+                        <button onClick={() => setAba('preparo')} class={`flex-1 p-3 ${aba==='preparo'?'bg-blue-700':''}`}>2. Planejar</button>
+                        <button onClick={() => setAba('compras')} class={`flex-1 p-3 ${aba==='compras'?'bg-blue-700':''}`}>3. Mercado</button>
+                    </nav>
+
+                    <main class="p-4 flex-1 overflow-y-auto">
+                        {/* ABA 1: CADASTRO GERAL */}
+                        {aba === 'geral' && (
+                            <div>
+                                <h2 class="font-bold mb-4 text-gray-700">Adicionar Novo Produto</h2>
+                                <div class="flex gap-2 mb-6">
+                                    <input value={novoItem.nome} onChange={e => setNovoItem({...novoItem, nome: e.target.value})} class="border p-2 flex-1 rounded" placeholder="Ex: Arroz" />
+                                    <select value={novoItem.cat} onChange={e => setNovoItem({...novoItem, cat: e.target.value})} class="border p-2 rounded">
+                                        <option>Limpeza</option><option>Hortifruti</option><option>Carnes</option><option>Outros</option>
+                                    </select>
+                                    <button onClick={addInventario} class="bg-green-500 text-white px-4 rounded">+</button>
+                                </div>
+                                <div class="space-y-2">
+                                    {inventario.map(i => (
+                                        <div key={i.id} class="flex justify-between p-2 bg-gray-50 rounded border text-sm">
+                                            <span>{i.nome}</span> <span class="text-gray-400">{i.cat}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ABA 2: LISTA DO DIA */}
+                        {aba === 'preparo' && (
+                            <div>
+                                <h2 class="font-bold mb-4">Selecione o que falta:</h2>
+                                {inventario.map(i => (
+                                    <label key={i.id} class="flex items-center gap-3 p-3 border-b cursor-pointer">
+                                        <input type="checkbox" checked={listaCompra.some(lc => lc.id === i.id)} onChange={() => toggleNaLista(i)} class="w-5 h-5" />
+                                        {i.nome}
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* ABA 3: MODO MERCADO */}
+                        {aba === 'compras' && (
+                            <div class="space-y-2">
+                                <h2 class="font-bold mb-4">No Carrinho:</h2>
+                                {listaCompra.sort((a,b) => a.cat.localeCompare(b.cat)).map(i => (
+                                    <div key={i.id} onClick={() => checkItem(i.id)} 
+                                        class={`p-4 rounded-lg border-2 flex justify-between items-center transition ${i.comprado ? 'bg-green-100 border-green-500 opacity-50' : 'bg-white border-gray-200'}`}>
+                                        <div>
+                                            <span class="text-xs font-bold text-blue-500 uppercase">{i.cat}</span>
+                                            <p class={`text-lg ${i.comprado ? 'line-through' : ''}`}>{i.nome}</p>
+                                        </div>
+                                        <div class="text-2xl">{i.comprado ? '✅' : '⬜'}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
