@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lista da Casa Final</title>
+    <title>Lista da Casa PRO</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -11,10 +11,8 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 font-sans">
-    <div id="root">
-        <div style="padding: 20px; text-align: center;">Carregando sistema...</div>
-    </div>
+<body class="bg-gray-100">
+    <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
@@ -29,48 +27,54 @@
             appId: "1:281529599553:web:2e466ab204c1dc7210a8c0"
         };
 
-        // Inicialização protegida
-        try {
-            if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-        } catch(e) { console.error("Erro Firebase:", e); }
-        
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
         function App() {
             const [aba, setAba] = useState('preparo');
             const [listaCompra, setListaCompra] = useState({});
             const [inventario, setInventario] = useState([]);
-            const [status, setStatus] = useState("Iniciando...");
             const [busca, setBusca] = useState("");
             const [sugestoes, setSugestoes] = useState([]);
             const [qtd, setQtd] = useState("");
+            const [salvando, setSalvando] = useState(false);
             const qtdRef = useRef();
 
             useEffect(() => {
-                // Monitor de conexão
-                db.ref(".info/connected").on("value", (snap) => {
-                    setStatus(snap.val() ? "CONECTADO ✅" : "DESCONECTADO ❌");
+                // Sincronizar Inventário (Produtos cadastrados)
+                db.ref('inventario_mestre').on('value', snap => {
+                    const val = snap.val() || {};
+                    setInventario(Object.entries(val).map(([id, v]) => ({ id, ...v })));
                 });
-
-                // Ler produtos
-                db.ref('inventario_mestre').on('value', (snap) => {
-                    const data = snap.val() || {};
-                    setInventario(Object.entries(data).map(([id, v]) => ({ id, ...v })));
-                });
-
-                // Ler lista do dia
-                db.ref('compra_atual').on('value', (snap) => {
+                // Sincronizar Lista do Dia
+                db.ref('compra_atual').on('value', snap => {
                     setListaCompra(snap.val() || {});
                 });
             }, []);
 
-            const add = (item) => {
+            const handleAdd = () => {
+                const item = inventario.find(i => i.nome.toLowerCase() === busca.toLowerCase());
+                if (!item) {
+                    alert("Por favor, selecione um produto da lista de sugestões.");
+                    return;
+                }
+                
+                setSalvando(true);
+                // Usamos o ID original do inventário para não duplicar
                 db.ref(`compra_atual/${item.id}`).set({
-                    ...item,
+                    nome: item.nome,
+                    cat: item.cat,
                     qtd: qtd || "1",
                     comprado: false
+                }).then(() => {
+                    setBusca("");
+                    setQtd("");
+                    setSugestoes([]);
+                    setSalvando(false);
+                }).catch(err => {
+                    alert("Erro ao salvar: " + err.message);
+                    setSalvando(false);
                 });
-                setBusca(""); setQtd(""); setSugestoes([]);
             };
 
             const itensAgrupados = Object.values(listaCompra).reduce((acc, item) => {
@@ -80,51 +84,61 @@
             }, {});
 
             return (
-                <div className="max-w-md mx-auto min-h-screen bg-white flex flex-col shadow-2xl">
-                    <div className="bg-slate-800 text-[10px] text-white p-1 text-center font-bold">
-                         {status} | {inventario.length} ITENS CADASTRADOS
+                <div className="max-w-md mx-auto min-h-screen bg-slate-50 flex flex-col shadow-2xl pb-20">
+                    <div className="bg-indigo-900 text-[10px] text-white p-1 text-center font-bold">
+                        SISTEMA ATIVO | {inventario.length} ITENS NO BANCO
                     </div>
                     
-                    <nav className="flex bg-indigo-700 text-white font-black text-[10px] uppercase sticky top-0 z-50 shadow-md">
-                        <button onClick={() => setAba('preparo')} className={`flex-1 py-4 ${aba==='preparo'?'bg-indigo-900 border-b-2 border-yellow-400':''}`}>Planejar</button>
-                        <button onClick={() => setAba('compras')} className={`flex-1 py-4 ${aba==='compras'?'bg-indigo-900 border-b-2 border-yellow-400':''}`}>Mercado</button>
+                    <nav className="flex bg-indigo-700 text-white font-bold text-xs uppercase sticky top-0 z-50">
+                        <button onClick={() => setAba('preparo')} className={`flex-1 py-4 ${aba==='preparo'?'bg-indigo-950 border-b-4 border-yellow-400':''}`}>1. Planejar</button>
+                        <button onClick={() => setAba('compras')} className={`flex-1 py-4 ${aba==='compras'?'bg-indigo-950 border-b-4 border-yellow-400':''}`}>2. Mercado</button>
                     </nav>
 
-                    <main className="flex-1 p-4 overflow-y-auto pb-10">
+                    <main className="p-4 overflow-y-auto">
                         {aba === 'preparo' && (
                             <div className="space-y-4">
-                                <div className="bg-indigo-600 p-4 rounded-3xl shadow-lg">
+                                <div className="bg-indigo-600 p-5 rounded-3xl shadow-xl">
+                                    <label className="text-white text-[10px] font-black uppercase mb-1 block opacity-70">Produto</label>
                                     <input 
                                         value={busca} 
                                         onChange={(e) => {
-                                            setBusca(e.target.value);
-                                            setSugestoes(e.target.value.length > 0 ? inventario.filter(i => i.nome.toLowerCase().includes(e.target.value.toLowerCase())).slice(0, 5) : []);
+                                            const v = e.target.value;
+                                            setBusca(v);
+                                            setSugestoes(v.length > 0 ? inventario.filter(i => i.nome.toLowerCase().includes(v.toLowerCase())).slice(0, 5) : []);
                                         }} 
-                                        placeholder="🔍 Buscar produto..." 
-                                        className="w-full p-4 rounded-2xl mb-2 outline-none text-slate-800 font-bold" 
+                                        placeholder="Digite o nome..." 
+                                        className="w-full p-4 rounded-2xl mb-2 outline-none text-gray-800 font-bold" 
                                     />
+                                    
                                     {sugestoes.length > 0 && (
-                                        <div className="bg-white rounded-2xl mb-2 shadow-2xl overflow-hidden border border-indigo-200">
+                                        <div className="bg-white rounded-2xl mb-2 shadow-2xl border border-indigo-200 overflow-hidden">
                                             {sugestoes.map(s => (
                                                 <div key={s.id} onClick={() => {setBusca(s.nome); setSugestoes([]); qtdRef.current.focus();}} className="p-4 border-b last:border-0 text-sm font-bold flex justify-between active:bg-indigo-100 cursor-pointer">
-                                                    <span className="text-slate-800">{s.nome}</span>
-                                                    <span className="text-[9px] bg-slate-100 px-2 py-1 rounded text-slate-400 uppercase tracking-tighter">{s.cat}</span>
+                                                    <span>{s.nome}</span>
+                                                    <span className="text-[9px] bg-slate-100 px-2 py-1 rounded text-slate-400 uppercase">{s.cat}</span>
                                                 </div>
                                             ))}
                                         </div>
                                     )}
+
+                                    <label className="text-white text-[10px] font-black uppercase mb-1 block opacity-70">Quantidade</label>
                                     <div className="flex gap-2">
-                                        <input ref={qtdRef} value={qtd} onChange={e => setQtd(e.target.value)} placeholder="Qtd..." className="flex-1 p-4 rounded-2xl outline-none font-bold" />
-                                        <button onClick={() => {
-                                            const item = inventario.find(i => i.nome.toLowerCase() === busca.toLowerCase());
-                                            if(item) add(item);
-                                        }} className="bg-yellow-400 text-indigo-900 px-8 rounded-2xl font-black uppercase text-xs">OK</button>
+                                        <input ref={qtdRef} value={qtd} onChange={e => setQtd(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAdd()} placeholder="Ex: 2kg" className="flex-1 p-4 rounded-2xl outline-none font-bold" />
+                                        <button 
+                                            disabled={salvando}
+                                            onClick={handleAdd} 
+                                            className={`${salvando ? 'bg-gray-400' : 'bg-yellow-400'} text-indigo-900 px-6 rounded-2xl font-black uppercase text-xs transition-all active:scale-95`}
+                                        >
+                                            {salvando ? '...' : 'Add'}
+                                        </button>
                                     </div>
                                 </div>
-                                <div className="space-y-2">
+
+                                <div className="space-y-2 mt-6">
+                                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Lista para comprar hoje:</h3>
                                     {Object.entries(listaCompra).map(([id, item]) => (
-                                        <div key={id} className="bg-white p-3 rounded-xl shadow-sm border-l-4 border-indigo-500 flex justify-between items-center">
-                                            <span className="font-bold text-slate-700 text-sm uppercase">{item.nome} ({item.qtd})</span>
+                                        <div key={id} className="bg-white p-4 rounded-2xl shadow-sm flex justify-between items-center border-l-8 border-indigo-500">
+                                            <span className="font-bold text-gray-700 uppercase text-xs">{item.nome} <span className="text-indigo-600">({item.qtd})</span></span>
                                             <button onClick={() => db.ref(`compra_atual/${id}`).remove()} className="text-red-400 font-bold p-2 text-xl">✕</button>
                                         </div>
                                     ))}
@@ -133,21 +147,19 @@
                         )}
 
                         {aba === 'compras' && (
-                            <div className="space-y-6">
-                                <div className="flex gap-2 mb-2 sticky top-0 z-10 p-1">
-                                    <button onClick={() => db.ref('compra_atual').remove()} className="flex-1 bg-red-100 text-red-600 p-3 rounded-2xl text-[10px] font-bold uppercase">Zerar Lista</button>
-                                </div>
+                            <div className="space-y-6 pb-20">
                                 {Object.keys(itensAgrupados).sort().map(cat => (
                                     <div key={cat} className="space-y-2">
-                                        <h3 className="text-[10px] font-black text-indigo-300 uppercase text-center border-b pb-1">{cat}</h3>
+                                        <h3 className="text-[10px] font-black text-indigo-300 uppercase text-center border-b pb-1 tracking-[0.2em]">{cat}</h3>
                                         {itensAgrupados[cat].map(item => {
-                                            const id = btoa(unescape(encodeURIComponent(item.nome))).replace(/=/g, "");
+                                            // Gerar ID seguro para o clique
+                                            const safeId = btoa(unescape(encodeURIComponent(item.nome))).replace(/=/g, "");
                                             return (
-                                                <div key={id} onClick={() => db.ref(`compra_atual/${id}`).update({comprado: !item.comprado})} 
-                                                     className={`p-4 rounded-3xl flex justify-between items-center transition-all ${item.comprado ? 'bg-slate-100 opacity-40 grayscale' : 'bg-white shadow-lg'}`}>
+                                                <div key={safeId} onClick={() => db.ref(`compra_atual/${safeId}`).update({comprado: !item.comprado})} 
+                                                     className={`p-5 rounded-[2rem] flex justify-between items-center transition-all ${item.comprado ? 'bg-gray-100 opacity-40 grayscale scale-95 shadow-none' : 'bg-white shadow-xl border-2 border-white active:scale-90'}`}>
                                                     <div className="flex gap-4 items-center">
-                                                        <div className="text-2xl">{item.comprado ? '✅' : '⬜'}</div>
-                                                        <span className={`text-xl font-bold ${item.comprado ? 'line-through text-slate-400' : 'text-slate-800'}`}>{item.nome}</span>
+                                                        <div className="text-3xl">{item.comprado ? '✅' : '⬜'}</div>
+                                                        <span className={`text-xl font-bold tracking-tight ${item.comprado ? 'line-through text-gray-400' : 'text-gray-800'}`}>{item.nome}</span>
                                                     </div>
                                                     <div className="bg-indigo-600 text-white px-3 py-1 rounded-xl font-bold text-xs">{item.qtd}</div>
                                                 </div>
