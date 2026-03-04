@@ -42,6 +42,10 @@
     </div>
 
     <script>
+        // BLOQUEIO DE SEGURANÇA NA ENTRADA DA PÁGINA
+if(localStorage.getItem('acesso_lista') !== 'autorizado') {
+    window.location.href = "index.html";
+}
         const firebaseConfig = {
             apiKey: "AIzaSyD4jdw3dkSl-63iyBypdip4NXUah2mdie8",
             authDomain: "rag-final-474711.firebaseapp.com",
