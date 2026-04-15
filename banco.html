@@ -3,49 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestão do Estoque</title>
+    <title>3. Gestão de Estoque PRO</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-900 p-4 text-white pb-20">
+<body class="bg-slate-900 p-4 text-white pb-20 font-sans">
     <div class="max-w-md mx-auto space-y-6">
-        <header class="flex justify-between items-center">
+        <header class="flex justify-between items-center no-print">
             <a href="index.html" class="text-indigo-400 font-bold text-[10px] uppercase">← Painel</a>
-            <h1 class="font-black uppercase italic text-xl">Administrar Banco</h1>
+            <h1 class="font-black uppercase italic text-xl tracking-tighter">Gestão Master</h1>
         </header>
 
-        <div class="bg-slate-800 p-6 rounded-[2rem] border border-slate-700 shadow-xl">
-            <h2 class="text-[10px] font-black uppercase text-indigo-400 mb-3 tracking-widest">Novo Produto</h2>
-            <input type="text" id="novo-nome" placeholder="Nome do produto..." class="w-full p-4 rounded-xl bg-slate-900 border border-slate-700 mb-3 outline-none font-bold">
-            
-            <div class="flex gap-2 mb-4">
-                <select id="nova-cat-select" class="flex-1 bg-slate-900 p-4 rounded-xl border border-slate-700 text-sm font-bold outline-none"></select>
+        <div class="bg-slate-800 p-4 rounded-3xl border border-slate-700 shadow-xl space-y-3">
+            <div>
+                <label class="text-[9px] font-black uppercase text-indigo-400 ml-2">Filtrar por Categoria</label>
+                <select id="filtro-categoria" onchange="renderProdutos()" class="w-full bg-slate-900 p-3 rounded-xl border border-slate-700 text-sm font-bold outline-none mt-1">
+                    <option value="TODAS">📦 Mostrar Todas as Categorias</option>
+                </select>
             </div>
-            
-            <button onclick="cadastrarProduto()" class="w-full bg-indigo-600 p-4 rounded-xl font-black uppercase text-xs shadow-lg active:scale-95 transition-all">Salvar no Estoque</button>
+            <div>
+                <label class="text-[9px] font-black uppercase text-indigo-400 ml-2">Buscar Nome</label>
+                <input type="text" id="filtro-nome" oninput="renderProdutos()" placeholder="🔍 Ex: Arroz..." class="w-full p-3 rounded-xl bg-slate-900 border border-slate-700 outline-none font-bold text-sm">
+            </div>
         </div>
 
-        <div class="bg-slate-800 p-6 rounded-[2rem] border border-slate-700">
-            <h2 class="text-[10px] font-black uppercase text-indigo-400 mb-3 tracking-widest">Criar Categoria</h2>
-            <div class="flex gap-2">
-                <input type="text" id="nova-cat-nome" placeholder="Nome da categoria..." class="flex-1 p-3 rounded-xl bg-slate-900 border border-slate-700 outline-none text-sm">
-                <button onclick="cadastrarCategoria()" class="bg-emerald-600 px-4 rounded-xl font-bold">+</button>
-            </div>
-            <div id="lista-categorias-gestao" class="flex flex-wrap gap-2 mt-4"></div>
-        </div>
-
-        <div class="pt-4">
-            <input type="text" id="filtro" oninput="renderProdutos()" placeholder="🔍 Pesquisar para editar..." class="w-full p-4 rounded-2xl bg-slate-800 border border-slate-700 outline-none font-bold mb-4">
-            <div id="container-produtos" class="space-y-3"></div>
-        </div>
+        <div id="status-contagem" class="text-[10px] text-center font-bold text-slate-500 uppercase"></div>
+        <div id="container-produtos" class="space-y-3"></div>
     </div>
 
     <script>
-        // BLOQUEIO DE SEGURANÇA NA ENTRADA DA PÁGINA
-if(localStorage.getItem('acesso_lista') !== 'autorizado') {
-    window.location.href = "index.html";
-}
+        if(localStorage.getItem('acesso_lista') !== 'autorizado') {
+            window.location.href = "index.html";
+        }
+
         const firebaseConfig = {
             apiKey: "AIzaSyD4jdw3dkSl-63iyBypdip4NXUah2mdie8",
             authDomain: "rag-final-474711.firebaseapp.com",
@@ -59,15 +50,22 @@ if(localStorage.getItem('acesso_lista') !== 'autorizado') {
         const db = firebase.database();
 
         let produtos = [];
-        let categorias = ["Geral", "Seminaristas", "Hortifruti", "Carnes", "Diversos", "Frios", "Frutas"];
+        let categorias = [];
 
         function limpar(s) { return s ? s.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : ""; }
 
-        // Sincronizar Categorias
+        // Sincronizar Categorias para o Select
         db.ref('categorias').on('value', s => {
-            const val = s.val();
-            if(val) categorias = Object.values(val);
-            atualizarMenusCategoria();
+            const val = s.val() || {};
+            categorias = Object.values(val).sort();
+            const select = document.getElementById('filtro-categoria');
+            const valorAtual = select.value;
+            
+            select.innerHTML = '<option value="TODAS">📦 Mostrar Todas as Categorias</option>';
+            categorias.forEach(c => {
+                select.innerHTML += `<option value="${c}">${c}</option>`;
+            });
+            select.value = valorAtual || "TODAS";
         });
 
         // Sincronizar Produtos
@@ -81,59 +79,46 @@ if(localStorage.getItem('acesso_lista') !== 'autorizado') {
             renderProdutos();
         });
 
-        function atualizarMenusCategoria() {
-            const select = document.getElementById('nova-cat-select');
-            select.innerHTML = categorias.map(c => `<option value="${c}">${c}</option>`).join('');
-            
-            const gestao = document.getElementById('lista-categorias-gestao');
-            gestao.innerHTML = categorias.map(c => `
-                <span class="bg-slate-700 px-3 py-1 rounded-full text-[10px] font-bold flex items-center gap-2">
-                    ${c} <button onclick="removerCategoria('${c}')" class="text-red-400">✕</button>
-                </span>
-            `).join('');
-            renderProdutos();
-        }
-
-        function cadastrarCategoria() {
-            const nome = document.getElementById('nova-cat-nome').value.trim();
-            if(!nome || categorias.includes(nome)) return;
-            const id = btoa(unescape(encodeURIComponent(nome))).replace(/=/g, "");
-            db.ref('categorias/' + id).set(nome);
-            document.getElementById('nova-cat-nome').value = '';
-        }
-
-        function removerCategoria(nome) {
-            if(confirm(`Remover categoria "${nome}"?`)) {
-                const id = btoa(unescape(encodeURIComponent(nome))).replace(/=/g, "");
-                db.ref('categorias/' + id).remove();
-            }
-        }
-
-        function cadastrarProduto() {
-            const nome = document.getElementById('novo-nome').value.trim();
-            const cat = document.getElementById('nova-cat-select').value;
-            if(!nome) return;
-            const id = btoa(unescape(encodeURIComponent(nome))).replace(/=/g, "");
-            db.ref('inventario_mestre/' + id).set({ nome, cat });
-            document.getElementById('novo-nome').value = '';
-        }
-
         function renderProdutos() {
-            const t = limpar(document.getElementById('filtro').value);
+            const categoriaFiltro = document.getElementById('filtro-categoria').value;
+            const nomeFiltro = limpar(document.getElementById('filtro-nome').value);
             const box = document.getElementById('container-produtos');
             box.innerHTML = '';
             
-            produtos.filter(p => limpar(p.nome).includes(t)).slice(0, 15).forEach(p => {
+            // Filtragem
+            let filtrados = produtos.filter(p => {
+                const bateNome = limpar(p.nome).includes(nomeFiltro);
+                const bateCat = categoriaFiltro === "TODAS" || p.cat === categoriaFiltro;
+                return bateNome && bateCat;
+            });
+
+            // Ordenação Alfabética Total
+            filtrados.sort((a, b) => a.nome.localeCompare(b.nome));
+
+            document.getElementById('status-contagem').innerText = `${filtrados.length} produtos exibidos`;
+
+            if (filtrados.length === 0) {
+                box.innerHTML = '<p class="text-center py-10 text-slate-600 uppercase font-bold text-xs">Nenhum item encontrado</p>';
+                return;
+            }
+
+            filtrados.forEach(p => {
                 const div = document.createElement('div');
-                div.className = "bg-slate-800 p-4 rounded-2xl border border-slate-700";
+                div.className = "bg-slate-800 p-3 rounded-2xl border border-slate-700 shadow-sm flex flex-col gap-2";
                 div.innerHTML = `
-                    <div class="flex gap-2 mb-2">
-                        <input type="text" value="${p.nome}" onblur="db.ref('inventario_mestre/${p.id}').update({nome: this.value})" class="flex-1 bg-slate-900 p-2 rounded-lg text-sm font-bold border-none outline-none">
-                        <button onclick="if(confirm('Apagar?')) db.ref('inventario_mestre/${p.id}').remove()" class="text-red-500 font-bold px-2">✕</button>
+                    <div class="flex gap-2">
+                        <input type="text" value="${p.nome}" 
+                            onblur="db.ref('inventario_mestre/${p.id}').update({nome: this.value})" 
+                            class="flex-1 bg-slate-900 p-2 rounded-lg text-sm font-bold border-none outline-none focus:ring-1 ring-indigo-500">
+                        <button onclick="if(confirm('Excluir permanentemente?')) db.ref('inventario_mestre/${p.id}').remove()" class="text-red-500 px-2 font-bold">✕</button>
                     </div>
-                    <select onchange="db.ref('inventario_mestre/${p.id}').update({cat: this.value})" class="w-full bg-slate-700 p-2 rounded-lg text-[10px] font-black uppercase text-slate-300">
-                        ${categorias.map(c => `<option value="${c}" ${p.cat === c ? 'selected' : ''}>${c}</option>`).join('')}
-                    </select>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[8px] font-black text-slate-500 uppercase ml-1">Cat:</span>
+                        <select onchange="db.ref('inventario_mestre/${p.id}').update({cat: this.value})" 
+                            class="flex-1 bg-slate-700 p-1.5 rounded-lg text-[10px] font-black uppercase text-slate-200 outline-none">
+                            ${categorias.map(c => `<option value="${c}" ${p.cat === c ? 'selected' : ''}>${c}</option>`).join('')}
+                        </select>
+                    </div>
                 `;
                 box.appendChild(div);
             });
