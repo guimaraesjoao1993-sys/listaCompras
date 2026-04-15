@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2. Mercado</title>
+    <title>2. Mercado - Otimizado</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -13,6 +13,9 @@
             body { background: white; padding: 0; }
             .bg-gray-100 { background: #f3f4f6 !important; border: 1px solid #ccc; }
         }
+        /* Estilo para animação de recolher */
+        .category-content { transition: max-height 0.3s ease-out; overflow: hidden; }
+        .collapsed { max-height: 0 !important; }
     </style>
 </head>
 <body class="bg-gray-100 p-4 pb-20 font-sans">
@@ -32,7 +35,6 @@
     </div>
 
     <script>
-        // BLOQUEIO DE SEGURANÇA NA ENTRADA (Opcional, se você usou na index)
         if(localStorage.getItem('acesso_lista') !== 'autorizado') {
             window.location.href = "index.html";
         }
@@ -49,75 +51,106 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // CONFIGURAÇÃO DE SEGURANÇA PARA APAGAR
-        const SENHA_PARA_ZERAR = "casa123"; // Você pode mudar esta senha
+        const SENHA_PARA_ZERAR = "casa123";
+        
+        // Estado global para lembrar quais categorias estão recolhidas
+        const categoriasRecolhidas = JSON.parse(localStorage.getItem('cats_recolhidas') || "{}");
 
         function confirmarZerar() {
-            const tentativa = prompt("Para APAGAR toda a lista, digite a senha de segurança:");
-            
-            if (tentativa === null) return; // Usuário cancelou
-            
+            const tentativa = prompt("Para APAGAR toda a lista, digite a senha:");
             if (tentativa === SENHA_PARA_ZERAR) {
-                if (confirm("TEM CERTEZA? Isso não pode ser desfeito.")) {
-                    db.ref('compra_atual').remove()
-                      .then(() => alert("Lista zerada com sucesso!"))
-                      .catch((e) => alert("Erro ao zerar: " + e.message));
-                }
-            } else {
-                alert("Senha incorreta! A lista foi mantida.");
+                if (confirm("TEM CERTEZA?")) db.ref('compra_atual').remove();
+            } else if (tentativa !== null) {
+                alert("Senha incorreta!");
             }
         }
 
-        // RENDERIZAÇÃO DA LISTA (COM ORDENAÇÃO)
-        db.ref('compra_atual').on('value', s => {
-            const val = s.val() || {};
-            const box = document.getElementById('container');
-            box.innerHTML = '';
-            
-            const itens = Object.entries(val).map(([id, data]) => ({id, ...data}));
+        function toggleCategoria(catNome) {
+            categoriasRecolhidas[catNome] = !categoriasRecolhidas[catNome];
+            localStorage.setItem('cats_recolhidas', JSON.stringify(categoriasRecolhidas));
+            renderizar();
+        }
 
-            // ORDENAÇÃO: Primeiro os NÃO comprados, depois os COMPRADOS (final da lista)
-            itens.sort((a, b) => a.comprado - b.comprado);
-
-            const categorias = {};
-            itens.forEach(i => {
-                const catNome = i.cat || "Geral";
-                if(!categorias[catNome]) categorias[catNome] = [];
-                categorias[catNome].push(i);
-            });
-
-            const catsOrdenadas = Object.keys(categorias).sort();
-
-            if (itens.length === 0) {
-                box.innerHTML = '<div class="text-center py-20 text-slate-400 font-bold uppercase text-xs">A lista está vazia</div>';
-                return;
-            }
-
-            catsOrdenadas.forEach(cat => {
-                const sec = document.createElement('div');
-                sec.className = "mb-6";
-                sec.innerHTML = `<h3 class="text-[10px] font-black text-indigo-400 uppercase text-center border-b pb-1 mb-3 tracking-widest">${cat}</h3>`;
+        function renderizar() {
+            db.ref('compra_atual').once('value', s => {
+                const val = s.val() || {};
+                const box = document.getElementById('container');
+                box.innerHTML = '';
                 
-                categorias[cat].forEach(item => {
-                    const div = document.createElement('div');
-                    div.className = `p-5 rounded-[2rem] flex justify-between items-center mb-2 transition-all cursor-pointer ${item.comprado ? 'bg-gray-200 opacity-50 grayscale' : 'bg-white shadow-lg border border-white'}`;
-                    
-                    div.onclick = () => db.ref('compra_atual/' + item.id).update({comprado: !item.comprado});
-                    
-                    div.innerHTML = `
-                        <div class="flex gap-4 items-center">
-                            <div class="text-2xl">${item.comprado ? '✅' : '⬜'}</div>
-                            <div>
-                                <b class="text-base ${item.comprado ? 'line-through text-gray-500' : 'text-gray-800'}">${item.nome}</b>
-                                ${item.obs ? `<p class="text-[10px] text-indigo-500 italic font-medium">${item.obs}</p>` : ''}
-                            </div>
-                        </div>
-                        <div class="bg-indigo-700 text-white px-3 py-1 rounded-xl font-bold text-xs">${item.qtd}</div>`;
-                    sec.appendChild(div);
+                const itens = Object.entries(val).map(([id, data]) => ({id, ...data}));
+
+                // 1. ORDENAÇÃO: Primeiro por status (comprado vai pro fim), DEPOIS Alfabética
+                itens.sort((a, b) => {
+                    if (a.comprado !== b.comprado) return a.comprado - b.comprado;
+                    return a.nome.localeCompare(b.nome);
                 });
-                box.appendChild(sec);
+
+                const categorias = {};
+                itens.forEach(i => {
+                    const c = i.cat || "Geral";
+                    if(!categorias[c]) categorias[c] = [];
+                    categorias[c].push(i);
+                });
+
+                const catsOrdenadas = Object.keys(categorias).sort();
+
+                if (itens.length === 0) {
+                    box.innerHTML = '<div class="text-center py-20 text-slate-400 font-bold uppercase text-xs">A lista está vazia</div>';
+                    return;
+                }
+
+                catsOrdenadas.forEach(cat => {
+                    const isCollapsed = categoriasRecolhidas[cat];
+                    const totalItens = categorias[cat].length;
+                    const comprados = categorias[cat].filter(i => i.comprado).length;
+                    const tudoPronto = totalItens === comprados;
+
+                    const sec = document.createElement('div');
+                    sec.className = "mb-4";
+                    
+                    // Cabeçalho da Categoria com Ícone de Expansão
+                    sec.innerHTML = `
+                        <div onclick="toggleCategoria('${cat}')" class="flex items-center justify-between bg-white/50 p-2 rounded-xl cursor-pointer border-b border-indigo-100 mb-2">
+                            <span class="text-[10px] font-black ${tudoPronto ? 'text-emerald-500' : 'text-indigo-400'} uppercase tracking-widest">
+                                ${cat} (${comprados}/${totalItens})
+                            </span>
+                            <span class="text-indigo-300 text-xs transition-transform ${isCollapsed ? 'rotate-180' : ''}">
+                                ${isCollapsed ? '➕' : '➖'}
+                            </span>
+                        </div>
+                        <div id="content-${cat}" class="category-content ${isCollapsed ? 'collapsed' : ''} space-y-2">
+                        </div>
+                    `;
+
+                    const contentBox = sec.querySelector(`#content-${cat}`);
+                    
+                    categorias[cat].forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = `p-4 rounded-[1.5rem] flex justify-between items-center mb-2 transition-all cursor-pointer ${item.comprado ? 'bg-gray-200 opacity-50 grayscale scale-95 shadow-none' : 'bg-white shadow-md border border-white'}`;
+                        
+                        div.onclick = (e) => {
+                            e.stopPropagation();
+                            db.ref('compra_atual/' + item.id).update({comprado: !item.comprado});
+                        };
+                        
+                        div.innerHTML = `
+                            <div class="flex gap-4 items-center">
+                                <div class="text-xl">${item.comprado ? '✅' : '⬜'}</div>
+                                <div>
+                                    <b class="text-base ${item.comprado ? 'line-through text-gray-500' : 'text-gray-800'}">${item.nome}</b>
+                                    ${item.obs ? `<p class="text-[10px] text-indigo-500 italic font-medium">${item.obs}</p>` : ''}
+                                </div>
+                            </div>
+                            <div class="bg-indigo-700 text-white px-3 py-1 rounded-xl font-bold text-xs">${item.qtd}</div>`;
+                        contentBox.appendChild(div);
+                    });
+                    box.appendChild(sec);
+                });
             });
-        });
+        }
+
+        // Listener em tempo real
+        db.ref('compra_atual').on('value', renderizar);
     </script>
 </body>
 </html>
