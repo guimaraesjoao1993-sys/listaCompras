@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3. Gestão de Estoque Completa</title>
+    <title>3. Gestão Master - Edição Total</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -17,23 +17,28 @@
 
         <details class="bg-indigo-900/30 border border-indigo-500/30 rounded-3xl overflow-hidden shadow-lg">
             <summary class="p-4 cursor-pointer font-black uppercase text-[10px] text-indigo-300 flex justify-between items-center outline-none">
-                ➕ Cadastrar Novo Item ou Categoria
+                📁 Gerenciar Categorias e Novo Item
             </summary>
-            <div class="p-4 space-y-4 bg-slate-800/50 border-t border-indigo-500/20">
+            <div class="p-4 space-y-6 bg-slate-800/50 border-t border-indigo-500/20">
+                
+                <div class="space-y-3">
+                    <label class="text-[9px] font-black uppercase text-indigo-400 ml-1">Suas Categorias (Toque para renomear)</label>
+                    <div id="lista-categorias-edit" class="space-y-2">
+                        </div>
+                    <div class="flex gap-2 pt-2">
+                        <input type="text" id="nova-cat-nome" placeholder="Nova categoria..." class="flex-1 p-3 rounded-xl bg-slate-900 border border-slate-700 outline-none text-sm font-bold">
+                        <button onclick="cadastrarCategoria()" class="bg-emerald-600 px-6 rounded-xl font-black uppercase text-[10px]">+</button>
+                    </div>
+                </div>
+
+                <hr class="border-slate-700">
+
                 <div class="space-y-2">
                     <label class="text-[9px] font-black uppercase text-indigo-400 ml-1">Novo Produto</label>
                     <input type="text" id="novo-nome" placeholder="Nome do produto..." class="w-full p-3 rounded-xl bg-slate-900 border border-slate-700 outline-none font-bold text-sm">
                     <div class="flex gap-2">
                         <select id="nova-cat-select" class="flex-1 bg-slate-900 p-3 rounded-xl border border-slate-700 text-sm font-bold outline-none"></select>
-                        <button onclick="cadastrarProduto()" class="bg-indigo-600 px-6 rounded-xl font-black uppercase text-[10px] shadow-lg">Salvar</button>
-                    </div>
-                </div>
-                <hr class="border-slate-700">
-                <div class="space-y-2">
-                    <label class="text-[9px] font-black uppercase text-indigo-400 ml-1">Nova Categoria</label>
-                    <div class="flex gap-2">
-                        <input type="text" id="nova-cat-nome" placeholder="Nome da categoria..." class="flex-1 p-3 rounded-xl bg-slate-900 border border-slate-700 outline-none text-sm font-bold">
-                        <button onclick="cadastrarCategoria()" class="bg-emerald-600 px-6 rounded-xl font-black uppercase text-[10px] shadow-lg">+</button>
+                        <button onclick="cadastrarProduto()" class="bg-indigo-600 px-6 rounded-xl font-black uppercase text-[10px]">Salvar</button>
                     </div>
                 </div>
             </div>
@@ -43,12 +48,12 @@
             <div>
                 <label class="text-[9px] font-black uppercase text-indigo-400 ml-2">Filtrar por Categoria</label>
                 <select id="filtro-categoria" onchange="renderProdutos()" class="w-full bg-slate-900 p-3 rounded-xl border border-slate-700 text-sm font-bold outline-none mt-1">
-                    <option value="TODAS">📦 Mostrar Todas as Categorias</option>
+                    <option value="TODAS">📦 Mostrar Todas</option>
                 </select>
             </div>
             <div>
                 <label class="text-[9px] font-black uppercase text-indigo-400 ml-2">Buscar Nome</label>
-                <input type="text" id="filtro-nome" oninput="renderProdutos()" placeholder="🔍 Ex: Arroz..." class="w-full p-3 rounded-xl bg-slate-900 border border-slate-700 outline-none font-bold text-sm">
+                <input type="text" id="filtro-nome" oninput="renderProdutos()" placeholder="🔍 Pesquisar..." class="w-full p-3 rounded-xl bg-slate-900 border border-slate-700 outline-none font-bold text-sm">
             </div>
         </div>
 
@@ -81,31 +86,73 @@
         // Sincronizar Categorias
         db.ref('categorias').on('value', s => {
             const val = s.val() || {};
-            categorias = Object.values(val).sort();
+            categorias = Object.entries(val).map(([id, nome]) => ({id, nome})).sort((a,b) => a.nome.localeCompare(b.nome));
             
-            // Atualizar Select do Filtro
-            const selectFiltro = document.getElementById('filtro-categoria');
-            const valorAtualFiltro = selectFiltro.value;
-            selectFiltro.innerHTML = '<option value="TODAS">📦 Mostrar Todas as Categorias</option>';
-            
-            // Atualizar Select de Cadastro
-            const selectCad = document.getElementById('nova-cat-select');
-            selectCad.innerHTML = '';
-
-            categorias.forEach(c => {
-                selectFiltro.innerHTML += `<option value="${c}">${c}</option>`;
-                selectCad.innerHTML += `<option value="${c}">${c}</option>`;
-            });
-            selectFiltro.value = valorAtualFiltro || "TODAS";
+            atualizarUI();
         });
 
-        // Funções de Cadastro
+        function atualizarUI() {
+            const listaEdit = document.getElementById('lista-categorias-edit');
+            const selectFiltro = document.getElementById('filtro-categoria');
+            const selectCad = document.getElementById('nova-cat-select');
+            
+            const valorFiltroAtual = selectFiltro.value;
+            
+            listaEdit.innerHTML = '';
+            selectFiltro.innerHTML = '<option value="TODAS">📦 Mostrar Todas</option>';
+            selectCad.innerHTML = '';
+
+            categorias.forEach(cat => {
+                // UI de Edição de Categorias
+                const div = document.createElement('div');
+                div.className = "flex gap-2";
+                div.innerHTML = `
+                    <input type="text" value="${cat.nome}" 
+                        onblur="renomearCategoria('${cat.id}', '${cat.nome}', this.value)"
+                        class="flex-1 bg-slate-900 p-2 rounded-lg text-xs font-bold border border-slate-700 outline-none focus:border-indigo-500">
+                    <button onclick="removerCategoria('${cat.id}', '${cat.nome}')" class="text-red-500 px-2">✕</button>
+                `;
+                listaEdit.appendChild(div);
+
+                // UI dos Selects
+                selectFiltro.innerHTML += `<option value="${cat.nome}">${cat.nome}</option>`;
+                selectCad.innerHTML += `<option value="${cat.nome}">${cat.nome}</option>`;
+            });
+
+            selectFiltro.value = valorFiltroAtual || "TODAS";
+            renderProdutos();
+        }
+
+        // FUNÇÃO MESTRE: Renomear Categoria e migrar produtos
+        function renomearCategoria(id, nomeAntigo, nomeNovo) {
+            nomeNovo = nomeNovo.trim();
+            if (!nomeNovo || nomeAntigo === nomeNovo) return;
+
+            if (confirm(`Renomear "${nomeAntigo}" para "${nomeNovo}"? Todos os produtos serão migrados.`)) {
+                // 1. Atualiza a categoria em si
+                db.ref('categorias/' + id).set(nomeNovo);
+
+                // 2. Procura produtos com a categoria antiga e atualiza
+                produtos.forEach(p => {
+                    if (p.cat === nomeAntigo) {
+                        db.ref('inventario_mestre/' + p.id).update({ cat: nomeNovo });
+                    }
+                });
+            }
+        }
+
         function cadastrarCategoria() {
             const nome = document.getElementById('nova-cat-nome').value.trim();
             if(!nome) return;
             const id = btoa(unescape(encodeURIComponent(nome))).replace(/=/g, "");
             db.ref('categorias/' + id).set(nome);
             document.getElementById('nova-cat-nome').value = '';
+        }
+
+        function removerCategoria(id, nome) {
+            if(confirm(`Excluir a categoria "${nome}"? Atenção: produtos desta categoria ficarão sem classificação.`)) {
+                db.ref('categorias/' + id).remove();
+            }
         }
 
         function cadastrarProduto() {
@@ -115,10 +162,8 @@
             const id = btoa(unescape(encodeURIComponent(nome))).replace(/=/g, "");
             db.ref('inventario_mestre/' + id).set({ nome, cat });
             document.getElementById('novo-nome').value = '';
-            alert(nome + " adicionado!");
         }
 
-        // Sincronizar Produtos e Renderizar
         db.ref('inventario_mestre').on('value', s => {
             const raw = s.val() || {};
             produtos = Object.entries(raw).map(([id, v]) => ({
@@ -158,7 +203,7 @@
                         <span class="text-[8px] font-black text-slate-500 uppercase ml-1">Cat:</span>
                         <select onchange="db.ref('inventario_mestre/${p.id}').update({cat: this.value})" 
                             class="flex-1 bg-slate-700 p-1.5 rounded-lg text-[10px] font-black uppercase text-slate-200 outline-none">
-                            ${categorias.map(c => `<option value="${c}" ${p.cat === c ? 'selected' : ''}>${c}</option>`).join('')}
+                            ${categorias.map(c => `<option value="${c.nome}" ${p.cat === c.nome ? 'selected' : ''}>${c.nome}</option>`).join('')}
                         </select>
                     </div>
                 `;
