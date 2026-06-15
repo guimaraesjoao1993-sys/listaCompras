@@ -13,8 +13,18 @@
             body { background: white; padding: 0; }
             .bg-gray-100 { background: #f3f4f6 !important; border: 1px solid #ccc; }
         }
-        .category-content { transition: max-height 0.3s ease-out; overflow: hidden; }
-        .collapsed { max-height: 0 !important; }
+        /* Transição suave para abrir e fechar as categorias */
+        .category-content { 
+            transition: max-height 0.25s ease-out, opacity 0.2s ease-out; 
+            overflow: hidden; 
+            max-height: 2000px; /* Valor alto para cobrir listas grandes */
+            opacity: 1;
+        }
+        .category-content.collapsed { 
+            max-height: 0 !important; 
+            opacity: 0 !important;
+            padding-bottom: 0 !important;
+        }
     </style>
 </head>
 <body class="bg-gray-100 p-4 pb-20 font-sans">
@@ -30,6 +40,7 @@
             <button onclick="confirmarZerar()" class="flex-1 bg-red-100 text-red-600 p-3 rounded-xl text-[10px] font-bold uppercase active:scale-95 transition-all">🗑️ Zerar Lista</button>
         </div>
 
+        <!-- Contador em tempo real para auditoria -->
         <div id="contador-geral" class="text-[10px] text-slate-400 font-bold uppercase text-center no-print">Carregando itens...</div>
 
         <div id="container" class="space-y-6 pt-2"></div>
@@ -64,19 +75,32 @@
             }
         }
 
-        function toggleCategoria(catNome) {
+        // CORREÇÃO AQUI: Altera o visual INSTANTANEAMENTE ao clicar
+        function toggleCategoria(catNome, index) {
+            // Inverte o estado no objeto de memória
             categoriasRecolhidas[catNome] = !categoriasRecolhidas[catNome];
             localStorage.setItem('cats_recolhidas', JSON.stringify(categoriasRecolhidas));
-            // A própria re-renderização será disparada pelo Firebase instantaneamente
+            
+            // Encontra os elementos direto no HTML da tela atual
+            const contentBox = document.getElementById(`cat-block-${index}`);
+            const icone = document.getElementById(`cat-icon-${index}`);
+            
+            if (categoriasRecolhidas[catNome]) {
+                contentBox.classList.add('collapsed');
+                icone.innerText = '➕';
+            } else {
+                contentBox.classList.remove('collapsed');
+                icone.innerText = '➖';
+            }
         }
 
-        // Sincronização e Renderização 100% Real-Time e Blindada
+        // Sincronização em Tempo Real com o Firebase
         db.ref('compra_atual').on('value', s => {
             const val = s.val() || {};
             const box = document.getElementById('container');
             box.innerHTML = '';
             
-            // Conversão ultra segura para evitar quebra com dados corrompidos ou antigos
+            // Conversão ultra segura dos dados
             const itens = Object.entries(val).map(([id, data]) => {
                 if (typeof data !== 'object' || data === null) {
                     return { id, nome: String(data), cat: "Geral", comprado: false, qtd: "1", obs: "" };
@@ -91,7 +115,7 @@
                 };
             });
 
-            // Atualiza o contador de auditoria do topo
+            // Atualiza o contador de cabeçalho
             const totalFalta = itens.filter(i => !i.comprado).length;
             document.getElementById('contador-geral').innerText = `${totalFalta} restantes de ${itens.length} itens na lista`;
 
@@ -100,7 +124,7 @@
                 return;
             }
 
-            // Ordenação: Itens comprados vão para o fim da lista, os ativos ficam em Ordem Alfabética
+            // Ordenação: Ativos em Ordem Alfabética, Comprados vão para o final
             itens.sort((a, b) => {
                 if (a.comprado !== b.comprado) return a.comprado - b.comprado;
                 return a.nome.localeCompare(b.nome);
@@ -116,27 +140,29 @@
 
             const listaCategoriasOrdenadas = Object.keys(categoriasAgrupadas).sort();
 
-            // Renderização no HTML usando IDs Numéricos (Blindagem contra caracteres especiais)
+            // Renderização no HTML
             listaCategoriasOrdenadas.forEach((cat, index) => {
                 const isCollapsed = !!categoriasRecolhidas[cat];
                 const totalItensCat = categoriasAgrupadas[cat].length;
                 const compradosCat = categoriasAgrupadas[cat].filter(i => i.comprado).length;
                 const tudoPronto = totalItensCat === compradosCat;
                 const uniqueContentId = `cat-block-${index}`;
+                const uniqueIconId = `cat-icon-${index}`;
 
                 const sec = document.createElement('div');
                 sec.className = "mb-4";
                 
-                // Monta o cabeçalho clicável da categoria
+                // Passa o index por parâmetro para facilitar a busca do elemento no clique
                 sec.innerHTML = `
-                    <div onclick="toggleCategoria('${cat.replace(/'/g, "\\'")}')" class="flex items-center justify-between bg-white/50 p-2 rounded-xl cursor-pointer border-b border-indigo-100 mb-2 no-print">
+                    <div onclick="toggleCategoria('${cat.replace(/'/g, "\\'")}', ${index})" class="flex items-center justify-between bg-white/50 p-2 rounded-xl cursor-pointer border-b border-indigo-100 mb-2 no-print">
                         <span class="text-[10px] font-black ${tudoPronto ? 'text-emerald-500' : 'text-indigo-400'} uppercase tracking-widest">
                             ${cat} (${compradosCat}/${totalItensCat})
                         </span>
-                        <span class="text-indigo-300 text-xs font-bold">
+                        <span id="${uniqueIconId}" class="text-indigo-300 text-xs font-bold">
                             ${isCollapsed ? '➕' : '➖'}
                         </span>
                     </div>
+                    <!-- Versão de Impressão -->
                     <div class="hidden print:block border-b border-gray-400 pb-1 mb-2">
                         <span class="text-xs font-bold uppercase text-black">${cat}</span>
                     </div>
@@ -148,7 +174,7 @@
                 box.appendChild(sec);
                 const contentBox = document.getElementById(uniqueContentId);
                 
-                // Renderiza os produtos dentro de sua respectiva categoria
+                // Inserção dos produtos da categoria
                 categoriasAgrupadas[cat].forEach(item => {
                     const div = document.createElement('div');
                     div.className = `p-4 rounded-[1.5rem] flex justify-between items-center mb-2 transition-all cursor-pointer ${item.comprado ? 'bg-gray-200 opacity-50 grayscale scale-95 shadow-none print:hidden' : 'bg-white shadow-md border border-white'}`;
